@@ -5,7 +5,7 @@
 - 마지막 갱신: 2026-10-01
 - 저장소: https://github.com/vkfkd420/flow
 - 과제 원문: [과제_파일업로드_AI개발.md](과제_파일업로드_AI개발.md)
-- 상세 진행 기록: [PROMPT_LOG.md](PROMPT_LOG.md) (#1 ~ #22)
+- 상세 진행 기록: [PROMPT_LOG.md](PROMPT_LOG.md) (#1 ~ #24)
 
 ---
 
@@ -73,75 +73,7 @@
 
 ## 4. 새 컴퓨터에서 이어서 하기
 
-### 4-1. 도구 설치 (Windows, winget)
-
-```bash
-winget install --id Git.Git -e
-winget install --id EclipseAdoptium.Temurin.17.JDK -e
-winget install --id OpenJS.NodeJS.22 -e
-winget install --id Oracle.MySQL -e --version 8.4.9
-```
-
-설치 후 터미널(또는 Claude 앱)을 다시 시작해야 PATH가 적용됩니다.
-
-### 4-2. Git 설정 및 저장소 받기
-
-```bash
-git config --global user.name "강현민"
-git config --global user.email "vkfkd420@naver.com"
-git clone https://github.com/vkfkd420/flow.git
-```
-
-### 4-3. MySQL 구성
-
-1. `C:\Program Files\MySQL\MySQL Server 8.4\bin\mysql_configurator.exe` 실행
-   - Development Computer, 포트 3306, root 비밀번호 설정, Windows 서비스 등록(자동 시작)
-2. DBeaver에서 root로 접속 후 실행
-
-```sql
-CREATE DATABASE flow CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER 'flow'@'localhost' IDENTIFIED BY '원하는_비밀번호';
-GRANT ALL PRIVILEGES ON flow.* TO 'flow'@'localhost';
-```
-
-3. 스키마가 작성된 뒤라면 `db/schema.sql`, `db/seed.sql` 순서로 실행
-
-### 4-4. 접속 정보 설정
-
-`backend/.env.example`을 `backend/.env`로 복사한 뒤 `DB_PASSWORD`, `AWS_S3_BUCKET`을 입력합니다. `.env`는 Git에 올라가지 않습니다.
-
-S3 자격 증명은 `.env`가 아니라 AWS CLI로 설정합니다 (액세스 키는 직접 입력).
-
-```bash
-winget install --id Amazon.AWSCLI -e
-aws configure
-```
-
-### 4-5. 실행 확인
-
-```bash
-cd backend
-./mvnw test
-./mvnw spring-boot:run
-```
-
-```bash
-cd frontend
-npm install
-npm run serve
-```
-
-- backend는 `backend` 폴더에서 실행해야 `.env`를 읽습니다.
-- 화면은 http://localhost:3000 (backend가 8080에서 실행 중이어야 함)
-- pull 후 처음 빌드할 때는 `./mvnw clean test` (이전 이름의 MyBatis XML이 `target/`에 남아 있으면 실패)
-
-### 4-6. Claude Code 지침 옮기기
-
-코딩 원칙 지침은 저장소가 아니라 **이전 컴퓨터의 `C:\Users\<사용자>\.claude\CLAUDE.md`**에 있습니다. 새 컴퓨터의 같은 위치에 복사해야 같은 규칙(한국어 응답, 최소 변경, 커밋 메시지 형식, `Co-Authored-By` 미사용 등)이 적용됩니다.
-
-새 세션을 시작할 때는 이렇게 요청하면 됩니다.
-
-> HANDOFF.md와 PROMPT_LOG.md 읽고 이어서 작업하자
+[SETUP.md](SETUP.md)를 따라 하세요. 루트의 `setup.ps1`로 한 번에 구성할 수 있습니다. (도구 설치, 저장소 받기, 로컬 MySQL, S3 자격 증명, `.env`, 실행, 동작 확인, 다른 컴퓨터에서 배포, 문제 해결, Claude 지침 옮기기)
 
 ---
 
@@ -178,4 +110,4 @@ bash deploy/deploy.sh 43.202.189.27
 - `deploy.sh`는 SSH만 사용하므로 `flow-deploy` 액세스 키가 없어도 됨 (인프라 변경 시에만 필요)
 
 ### 정리 (과제 종료 후)
-태그 `Project=flow` 리소스 삭제: EC2 종료 → Elastic IP 해제 → RDS 삭제 → 보안 그룹 → IAM 역할/인스턴스 프로필 → 키 페어. Elastic IP는 인스턴스에서 떼어낸 뒤에도 과금되므로 반드시 해제
+[CLEANUP.md](CLEANUP.md)를 순서대로 따라 하세요. (Elastic IP 해제와 RDS 자동 백업 삭제를 놓치기 쉬움)
