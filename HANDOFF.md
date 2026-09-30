@@ -5,7 +5,7 @@
 - 마지막 갱신: 2026-10-01
 - 저장소: https://github.com/vkfkd420/flow
 - 과제 원문: [과제_파일업로드_AI개발.md](과제_파일업로드_AI개발.md)
-- 상세 진행 기록: [PROMPT_LOG.md](PROMPT_LOG.md) (#1 ~ #18)
+- 상세 진행 기록: [PROMPT_LOG.md](PROMPT_LOG.md) (#1 ~ #19)
 
 ---
 
@@ -50,18 +50,21 @@
   - 저장: S3 `uploads/{UUID}` (원본 파일명 미사용, `application/octet-stream`), 1건 1개, 10MB (초과 시 413)
   - 검사 순서: 파일명(금지 문자, 255자) → 확장자 정책(모든 점 구간, 끝의 점·공백 무시) → 실행 파일 위장(PE/ELF/Mach-O/`#!/`)
   - 자격 증명은 AWS SDK 기본 체인 (로컬 `~/.aws/credentials`, 배포 IAM 역할). 버킷은 `AWS_S3_BUCKET`
+- [x] 프론트 화면 (PROMPT_LOG #19) — 탭 2개(확장자 차단 정책 / 파일 업로드), axios, 직접 작성한 CSS
+  - 개발 서버 `localhost:3000`, `/api`는 `localhost:8080`으로 프록시 (`vue.config.js`). 코드는 상대 경로 `/api`만 사용
+  - 클라이언트 검증(정규화·중복·고정 겹침·200개·10MB)은 즉시 안내용, 최종 판단은 서버
+  - 저장 실패 시 체크 상태 되돌림, 삭제 404 시 목록에서 제거(DB와 맞춤), 로딩 실패 시 다시 시도
 
 ## 3. 다음에 할 것
 
 1. **S3 실제 연동 확인**: 버킷 생성(퍼블릭 액세스 차단), 앱 전용 IAM 사용자(`uploads/*` PutObject만), AWS CLI 설치 후 `aws configure`, `.env`에 `AWS_S3_BUCKET`
-2. **프론트 화면**: 정책 관리 화면 + 업로드 화면, 로딩/에러 처리
    - 테이블명은 항상 대문자 `FILE_EXTENSION_POLICY` (Linux MySQL은 테이블명 대소문자 구분)
-3. **문서**: `CONSIDERATIONS.md` (과제 3번 항목 전체), `README.md` 실행 방법, `PROMPT_LOG.md` 회고
-4. **배포**: AWS. 앱 실행과 운영 MySQL에 쓸 서비스, 비용(무료 크레딧/프리 티어 조건)은 확인 필요. 면접 당일까지 접속 가능해야 함
+2. **문서**: `CONSIDERATIONS.md` (과제 3번 항목 전체), `README.md` 실행 방법, `PROMPT_LOG.md` 회고
+3. **배포**: AWS. 앱 실행과 운영 MySQL에 쓸 서비스, 비용(무료 크레딧/프리 티어 조건)은 확인 필요. 면접 당일까지 접속 가능해야 함
 
 ### 미정 / 확인 필요
-- AWS에서 사용할 서비스 구성 (앱 실행, 운영 DB)과 비용
-- 로컬 개발 포트: Spring Boot와 Vue CLI 개발 서버의 기본 포트가 둘 다 8080 (Vue CLI는 사용 중이면 다른 포트로 자동 변경). 프록시 설정과 함께 정해야 함
+- AWS에서 사용할 서비스 구성 (앱 실행, 운영 DB)과 비용, 프론트 배포 방식 (Spring Boot에 포함 / S3+CloudFront 등)
+- 프론트 빌드 경고 `export 'default' (imported as 'style0') was not found`: `<style>` 블록마다 발생, 스캐폴드 원본에도 있음(webpack 5.111 + vue-loader 15 조합으로 추정). CSS 결과물은 정상
 
 ---
 
@@ -126,6 +129,8 @@ npm run serve
 ```
 
 - backend는 `backend` 폴더에서 실행해야 `.env`를 읽습니다.
+- 화면은 http://localhost:3000 (backend가 8080에서 실행 중이어야 함)
+- pull 후 처음 빌드할 때는 `./mvnw clean test` (이전 이름의 MyBatis XML이 `target/`에 남아 있으면 실패)
 
 ### 4-6. Claude Code 지침 옮기기
 
