@@ -24,6 +24,12 @@
 		 WHERE EXTENSION = #{extension}
 	</select>
 
+	<select id="findBlockedExtensions" resultType="string">
+		SELECT EXTENSION
+		  FROM FILE_EXTENSION_POLICY
+		 WHERE IS_BLOCKED = 1
+	</select>
+
 	<!--
 		커스텀 추가를 직렬화하기 위한 잠금.
 		InnoDB 기본 격리 수준(REPEATABLE READ)에서 조회 범위의 행과 간격(gap)까지 잠기므로,

@@ -12,6 +12,8 @@ public interface ExtensionPolicyDao {
 
 	ExtensionPolicy findByExtension(String extension);
 
+	List<String> findBlockedExtensions();
+
 	int countCustomForUpdate();
 
 	void insertCustom(@Param("extension") String extension);

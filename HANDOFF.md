@@ -5,7 +5,7 @@
 - 마지막 갱신: 2026-10-01
 - 저장소: https://github.com/vkfkd420/flow
 - 과제 원문: [과제_파일업로드_AI개발.md](과제_파일업로드_AI개발.md)
-- 상세 진행 기록: [PROMPT_LOG.md](PROMPT_LOG.md) (#1 ~ #17)
+- 상세 진행 기록: [PROMPT_LOG.md](PROMPT_LOG.md) (#1 ~ #18)
 
 ---
 
@@ -46,15 +46,18 @@
   - 에러 응답은 `{ code, message }` (message는 화면에 그대로 표시), 입력 앞의 점은 하나만 제거
   - 200개 제한은 `SELECT COUNT(*) ... FOR UPDATE` 잠금으로 직렬화 (동시성 테스트로 확인)
   - 정규화 규칙은 `ExtensionRule` 한 곳에 있음 → 업로드 검사에서도 재사용
+- [x] 파일 업로드 API `POST /api/files` (PROMPT_LOG #18) — 전체 테스트 56개 통과, S3는 Mock으로 테스트
+  - 저장: S3 `uploads/{UUID}` (원본 파일명 미사용, `application/octet-stream`), 1건 1개, 10MB (초과 시 413)
+  - 검사 순서: 파일명(금지 문자, 255자) → 확장자 정책(모든 점 구간, 끝의 점·공백 무시) → 실행 파일 위장(PE/ELF/Mach-O/`#!/`)
+  - 자격 증명은 AWS SDK 기본 체인 (로컬 `~/.aws/credentials`, 배포 IAM 역할). 버킷은 `AWS_S3_BUCKET`
 
 ## 3. 다음에 할 것
 
-1. **파일 업로드 API**: 서버 측 정책 강제, 차단 사유 반환, 안전한 저장 (원본 파일명 사용 금지 등)
-   - 테이블명은 항상 대문자 `FILE_EXTENSION_POLICY` (Linux MySQL은 테이블명 대소문자 구분)
+1. **S3 실제 연동 확인**: 버킷 생성(퍼블릭 액세스 차단), 앱 전용 IAM 사용자(`uploads/*` PutObject만), AWS CLI 설치 후 `aws configure`, `.env`에 `AWS_S3_BUCKET`
 2. **프론트 화면**: 정책 관리 화면 + 업로드 화면, 로딩/에러 처리
-3. **테스트**: 업로드 검증 로직 (정책 API 테스트는 완료)
-4. **문서**: `CONSIDERATIONS.md` (과제 3번 항목 전체), `README.md` 실행 방법, `PROMPT_LOG.md` 회고
-5. **배포**: AWS. 앱 실행과 운영 MySQL에 쓸 서비스, 비용(무료 크레딧/프리 티어 조건)은 확인 필요. 면접 당일까지 접속 가능해야 함
+   - 테이블명은 항상 대문자 `FILE_EXTENSION_POLICY` (Linux MySQL은 테이블명 대소문자 구분)
+3. **문서**: `CONSIDERATIONS.md` (과제 3번 항목 전체), `README.md` 실행 방법, `PROMPT_LOG.md` 회고
+4. **배포**: AWS. 앱 실행과 운영 MySQL에 쓸 서비스, 비용(무료 크레딧/프리 티어 조건)은 확인 필요. 면접 당일까지 접속 가능해야 함
 
 ### 미정 / 확인 필요
 - AWS에서 사용할 서비스 구성 (앱 실행, 운영 DB)과 비용
@@ -99,7 +102,14 @@ GRANT ALL PRIVILEGES ON flow.* TO 'flow'@'localhost';
 
 ### 4-4. 접속 정보 설정
 
-`backend/.env.example`을 `backend/.env`로 복사한 뒤 `DB_PASSWORD`를 입력합니다. `.env`는 Git에 올라가지 않습니다.
+`backend/.env.example`을 `backend/.env`로 복사한 뒤 `DB_PASSWORD`, `AWS_S3_BUCKET`을 입력합니다. `.env`는 Git에 올라가지 않습니다.
+
+S3 자격 증명은 `.env`가 아니라 AWS CLI로 설정합니다 (액세스 키는 직접 입력).
+
+```bash
+winget install --id Amazon.AWSCLI -e
+aws configure
+```
 
 ### 4-5. 실행 확인
 

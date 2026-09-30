@@ -189,6 +189,27 @@ AI 활용 기록 (과제 4번 항목)
 - **문제와 해결**: 이동 후 테스트 실행 시 컨텍스트 로딩 실패. 원인은 코드가 아니라 `target/classes`에 이름을 바꾸기 전의 `ExtensionPolicyMapper.xml`이 남아 MyBatis가 옛 XML까지 읽은 것 → `mvnw clean test`로 해결
 - **검증**: `clean test` 34개 통과, 빌드 결과물에 새 XML만 있는 것 확인
 
+### #18 파일 업로드 API
+- **입력**: `파일 업로드 API 시작하자`
+- **AI 질문** (선택지 + 미리보기): 저장 방식(로컬 디스크 + UUID / 로컬 + DB 기록 / S3), 제한(1건 1개 10MB / 여러 개), 내용 검사(실행 파일 위장만 차단 / 안 함 / Apache Tika)
+- **선택**: **S3** (AI 추천은 로컬 디스크), 1건 1개 10MB, 실행 파일 위장만 차단
+- **AI 확인**: 이 컴퓨터에 AWS CLI와 자격 증명 없음 → 사용자는 AWS 계정만 있고 버킷은 없음. **코드를 먼저 짜고 테스트에서는 S3를 Mock으로 대체**하기로 함
+- **AI 작업**:
+  - 처리 순서: 파일명 검사 → 확장자 정책(모든 점 구간) → 내용(매직 넘버) → S3 저장
+  - `UploadFileRule`: 경로 제거(basename), 끝의 점·공백 제거(Windows가 무시하므로 `a.exe.`는 exe), 첫 구간을 뺀 모든 점 구간을 확장자 후보로 사용, 제어 문자와 `:*?"<>|` 거부(NTFS 스트림 `a.txt::$DATA`, 널 바이트 `a\0.exe.jpg` 등), 파일명 255자 제한
+  - `ExecutableSignature`: Windows PE, ELF, Mach-O, 스크립트(`#!/`) 판별. 형식에 맞는 확장자(exe, so, sh 등)가 아니면 위장으로 차단 — 확장자가 맞으면 판단은 확장자 정책에 맡김
+    - PE는 `MZ`만 보면 MZ로 시작하는 텍스트도 걸리므로 `e_lfanew`가 가리키는 `PE\0\0`까지 확인 (AI가 오탐 가능성을 따져 보완)
+    - `CAFEBABE`(Mach-O 유니버설)는 Java class 파일과 매직 넘버가 같아 제외
+  - S3 저장: 키는 `uploads/{UUID}` (원본 파일명·확장자 미사용 → 경로 조작, 덮어쓰기, 확장자 기반 실행 방지), `Content-Type`은 클라이언트 값을 믿지 않고 `application/octet-stream`, 원본 파일명은 URL 인코딩해서 메타데이터에 보관
+  - 자격 증명은 AWS SDK 기본 체인 사용 (로컬 `~/.aws/credentials`, 배포는 IAM 역할) → 앱 설정과 `.env`에 액세스 키를 두지 않음
+  - 오류: `EMPTY_FILE`, `INVALID_FILE_NAME`, `FILE_NAME_TOO_LONG`, `BLOCKED_EXTENSION`, `DISGUISED_EXECUTABLE`(400), `FILE_TOO_LARGE`(413), `STORAGE_UNAVAILABLE`(503, 버킷 미설정·S3 오류)
+  - 로그: 성공과 차단 모두 남김. 제어 문자가 있는 파일명은 로그 주입 방지를 위해 기록하지 않음
+- **검증**: 테스트 56개 통과 (새로 22개)
+  - `UploadFileRuleTest`, `ExecutableSignatureTest`: 이중 확장자, 끝의 점·공백, 경로, 금지 문자, MZ로 시작하는 텍스트(오탐 없음), 범위를 벗어난 PE 오프셋
+  - `FileUploadApiTest` (S3 Mock): UUID 키와 `octet-stream` 저장, 고정 확장자 체크 전후, `invoice.exe.txt`·`SETUP.EXE`·`setup.exe.` 차단, 커스텀 `sh` 차단, `report.jpg`(PE)·`run`(ELF)·`notes.txt`(`#!/bin/sh`) 위장 차단, 차단 시 S3 호출 없음, S3 오류 시 503
+  - **실제 서버로 확인**: MockMvc는 multipart 크기 제한을 적용하지 않아 서버를 띄워 curl로 확인 → 5MB는 검사 통과 후 503(버킷 미설정), 12MB·60MB는 연결이 끊기지 않고 413과 안내 메시지
+- **남은 것**: 실제 S3 버킷 연동 확인 (버킷, IAM 사용자, `aws configure` 준비 후)
+
 ---
 
 ## 2. 사용한 스킬 / 플러그인 / 도구
@@ -198,6 +219,8 @@ AI 활용 기록 (과제 4번 항목)
 | Claude Code | 과제 분석, 환경 확인, 문서 작성 | 코딩 에이전트로 파일 읽기·명령 실행·작성을 한 곳에서 처리 |
 | Spring Initializr (start.spring.io) | backend 생성 | 버전/의존성 호환 범위를 메타데이터로 확인하고 생성 |
 | Vue CLI 5 (`@vue/cli`) | frontend 생성 | 선택한 Vue 2 구성 |
+| AWS SDK for Java v2 (`s3` 2.55.8) | 업로드 파일 S3 저장 | 배포처 AWS에 맞춰 선택, 자격 증명 기본 체인 사용 |
+| Mockito `@MockitoBean` | 업로드 API 테스트 | 버킷 없이 S3 호출 여부·요청 내용(키, Content-Type) 검증 |
 | winget | JDK 17, Node.js 22 설치 | Windows 기본 패키지 관리자로 버전 고정 설치 |
 | `~/.claude/CLAUDE.md` (전역 지침) | 모든 작업 | 요청 범위 밖 수정 방지, 불확실성 명시, 커밋 메시지 형식 통일 |
 
