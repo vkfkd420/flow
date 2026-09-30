@@ -5,7 +5,7 @@
 - 마지막 갱신: 2026-09-30
 - 저장소: https://github.com/vkfkd420/flow
 - 과제 원문: [과제_파일업로드_AI개발.md](과제_파일업로드_AI개발.md)
-- 상세 진행 기록: [PROMPT_LOG.md](PROMPT_LOG.md) (#1 ~ #8)
+- 상세 진행 기록: [PROMPT_LOG.md](PROMPT_LOG.md) (#1 ~ #11)
 
 ---
 
@@ -18,6 +18,7 @@
 | DB 접근 | MyBatis 4.0.1 | JPA 대신 선택 (스키마와 SQL이 1:1로 드러나도록) |
 | DB | MySQL 8.4 (로컬 8.4.9) | 처음엔 Oracle(OCI)로 정했다가 MySQL로 변경 |
 | DB 관리 | DBeaver | |
+| 배포 | AWS | 사용할 서비스(앱 실행, DB)는 미정 |
 | 패키지명 | `com.flow` | |
 | 고정 확장자 | **체크 = 차단** | 기본값은 모두 해제 |
 | 인증 | 없음 (추후 고려) | 공개 배포 시 누구나 정책 변경 가능 → CONSIDERATIONS에 기록 예정 |
@@ -36,23 +37,23 @@
 - [x] 로컬 MySQL 구성: DB `flow` (utf8mb4), 전용 계정 `flow@localhost` (`flow.*` 권한만)
 - [x] Spring Boot ↔ MySQL 연결 확인 (DataSource, MyBatis SqlSession 양쪽에서 쿼리 실행)
 - [x] 검증: frontend `lint` / `build` 통과, backend `mvnw test` 통과
+- [x] 두 번째 컴퓨터 환경 구성: JDK 17 (사용자 `JAVA_HOME` 17로 변경), MySQL 8.4.9, `backend/.env`, 연결 확인 (PROMPT_LOG #10~#14)
+- [x] 테이블 스키마: `FILE_EXTENSION_POLICY` 한 테이블 (`TYPE` FIXED/CUSTOM, `IS_BLOCKED`), `EXTENSION` UNIQUE, 형식 CHECK(`^[a-z0-9]{1,20}$`), 로컬 DB 적용 및 제약 테스트 (PROMPT_LOG #15)
+  - 커스텀에 고정 확장자 입력 시 거부하고 안내 / 업로드 시 파일명의 모든 점 구간 검사 / 이력은 생성·수정 시각만
 
 ## 3. 다음에 할 것
 
-1. **테이블 스키마 설계** → `db/schema.sql`, `db/seed.sql`
-   - 고정/커스텀 확장자를 테이블 하나로 둘지 둘로 나눌지
-   - 확장자 정규화 규칙 (소문자, 앞의 `.` 제거, 허용 문자)
-   - 중복 방지 (UNIQUE 제약), 고정 확장자와 커스텀이 겹치는 경우 처리
-   - 컬럼/타입/제약/인덱스 명시 (제출 필수)
-2. **백엔드 API**: 정책 조회, 고정 확장자 체크 변경, 커스텀 추가/삭제 (20자, 200개 제한, 중복 방지)
-3. **파일 업로드 API**: 서버 측 정책 강제, 차단 사유 반환, 안전한 저장 (원본 파일명 사용 금지 등)
-4. **프론트 화면**: 정책 관리 화면 + 업로드 화면, 로딩/에러 처리
-5. **테스트**: 확장자 검증 로직 중심
-6. **문서**: `CONSIDERATIONS.md` (과제 3번 항목 전체), `README.md` 실행 방법, `PROMPT_LOG.md` 회고
-7. **배포**: 배포처와 운영 MySQL 호스팅 미정 (후보: Aiven, TiDB Cloud Serverless, Cloudtype — 무료 조건은 확인 필요). 면접 당일까지 접속 가능해야 함
+1. **백엔드 API**: 정책 조회, 고정 확장자 체크 변경, 커스텀 추가/삭제 (20자, 200개 제한, 중복 방지)
+   - 200개 제한은 DB 제약으로 못 막으므로 동시 요청 시 초과하지 않도록 락 처리
+   - 테이블명은 항상 대문자 `FILE_EXTENSION_POLICY` (Linux MySQL은 테이블명 대소문자 구분)
+2. **파일 업로드 API**: 서버 측 정책 강제, 차단 사유 반환, 안전한 저장 (원본 파일명 사용 금지 등)
+3. **프론트 화면**: 정책 관리 화면 + 업로드 화면, 로딩/에러 처리
+4. **테스트**: 확장자 검증 로직 중심
+5. **문서**: `CONSIDERATIONS.md` (과제 3번 항목 전체), `README.md` 실행 방법, `PROMPT_LOG.md` 회고
+6. **배포**: AWS. 앱 실행과 운영 MySQL에 쓸 서비스, 비용(무료 크레딧/프리 티어 조건)은 확인 필요. 면접 당일까지 접속 가능해야 함
 
 ### 미정 / 확인 필요
-- 배포처와 운영 DB 호스팅
+- AWS에서 사용할 서비스 구성 (앱 실행, 운영 DB)과 비용
 - 로컬 개발 포트: Spring Boot와 Vue CLI 개발 서버의 기본 포트가 둘 다 8080 (Vue CLI는 사용 중이면 다른 포트로 자동 변경). 프록시 설정과 함께 정해야 함
 
 ---

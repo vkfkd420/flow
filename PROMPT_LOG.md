@@ -98,6 +98,64 @@ AI 활용 기록 (과제 4번 항목)
   - 전역 지침(`~/.claude/CLAUDE.md`)은 저장소 밖에 있어서 새 컴퓨터로 따로 옮겨야 한다는 점을 명시
   - 정리하면서 새로 확인한 문제: Spring Boot와 Vue CLI 개발 서버의 기본 포트가 둘 다 8080 → 미정 사항에 추가
 
+### #10 다른 컴퓨터에서 작업 재개 - 현황 분석
+- **입력**: `파일을 분석부터해봐`
+- **AI 작업**: 과제 문서, HANDOFF, PROMPT_LOG, 소스 파일을 읽고 현재 상태 요약 (뼈대만 있고 기능 코드는 없음)
+- **확인 결과**: 이 컴퓨터의 환경이 HANDOFF에 적힌 구성과 다름
+  - JDK 8만 설치됨 (backend는 17 필요), Node.js 20 (기존 22), MySQL 미설치, `backend/.env`와 전역 지침 `~/.claude/CLAUDE.md` 없음
+  - HANDOFF의 PROMPT_LOG 범위 표기(#1 ~ #8)가 실제(#9까지)와 다름
+
+### #11 배포처 변경: AWS
+- **입력**: `그전에 내용을 수정할게 aws로 배포할거야`
+- **AI 작업**: HANDOFF 결정사항에 배포 항목(AWS) 추가, 다음 할 일과 미정 사항에서 기존 후보(Aiven, TiDB Cloud, Cloudtype)를 AWS로 교체
+  - 앱 실행과 운영 DB에 쓸 AWS 서비스는 아직 정하지 않았으므로 미정으로 남김
+
+### #12 JDK 17 설치
+- **입력**: `응 JDK 17 설치부터 해줘`
+- **AI 작업**: winget으로 Temurin JDK 17(17.0.20.1) 설치
+- **확인 결과**:
+  - 설치 후 시스템 `JAVA_HOME`은 17로 잡혔지만, **사용자 `JAVA_HOME`이 JDK 8(`C:\Program Files\Java\jdk1.8.0_311`)로 설정되어 있어 시스템 값을 덮어씀** → `mvnw`는 `JAVA_HOME`을 쓰므로 그대로 두면 Java 8로 빌드되어 실패
+  - 사용자 `JAVA_HOME`은 다른 프로젝트에서 쓰고 있을 수 있어 AI가 임의로 바꾸지 않음
+  - 설치 전에도 Microsoft Build of OpenJDK 17(17.0.19)이 이미 있었음 (분석 단계에서 `Program Files\Microsoft` 경로를 확인하지 않아 놓침)
+- **검증**: 현재 세션에서만 `JAVA_HOME`을 Temurin 17로 지정해 `mvnw compile` 통과 (테스트는 DB가 없어 아직 실행 안 함)
+- **AI 제시 선택지**: 사용자 `JAVA_HOME`을 17로 변경 / 그대로 두고 이 프로젝트 실행 시에만 17 지정
+- **입력**: `1번으로 JAVA_HOME 17로 바꿔줘` → 사용자 `JAVA_HOME`을 Temurin 17 경로로 변경, 변경 값으로 `mvnw compile` 다시 통과
+  - 사용자 PATH의 JDK 8 `bin`은 시스템 PATH(17)보다 뒤에 오므로 그대로 둠
+
+### #13 MySQL 8.4.9 설치 (새 컴퓨터)
+- **AI 제시 선택지**: HANDOFF대로 직접 설치 / 이미 있는 Docker로 컨테이너 실행
+- **입력**: `MySQL 8.4.9 직접 설치해줘`
+- **AI 작업**: winget으로 `Oracle.MySQL` 8.4.9 설치 (의존성 VC++ 재배포 패키지 포함), `mysqld --version`으로 8.4.9 확인
+- **확인 결과**: #7과 같이 MSI 무인 설치는 프로그램 파일만 설치함 (서비스 없음, 데이터 디렉터리 없음, 3306 미사용)
+  - root 비밀번호 설정이 필요한 초기 구성은 사용자가 MySQL Configurator로 직접 진행하도록 안내 (HANDOFF 4-3 절차)
+  - DBeaver는 이 컴퓨터에 이미 설치되어 있음 확인
+
+### #14 DB 연결 확인 (새 컴퓨터)
+- **입력**: `설정 완료했어, 연결 확인해줘`
+- **AI 작업**: 확인해 보니 `MySQL84` 서비스는 실행 중(자동 시작)이지만 `backend/.env`가 없음 → `.env.example`을 복사해 `.env`를 만들고 `git check-ignore`로 Git 제외 확인, 비밀번호는 사용자가 직접 입력하도록 안내
+- **입력**: `비밀번호 입력했어, 연결 확인해줘`
+- **검증** (#8과 같은 2단계):
+  1. `mysql` CLI로 `flow` 계정 로그인 → `flow@localhost`, MySQL 8.4.9, DB 문자셋 `utf8mb4` / `utf8mb4_unicode_ci`, 권한 `flow.*`만 확인 (비밀번호는 `.env`에서 읽고 출력하지 않음)
+  2. 임시 테스트로 `DataSource`와 MyBatis `SqlSession`에서 쿼리 실행 → `flow` DB, Connector/J 9.7.0 확인. `contextLoads` 포함 테스트 3개 통과 후 임시 테스트 파일 삭제
+
+### #15 테이블 스키마 설계
+- **입력**: `이제 작업 이어서 시작하자`
+- **AI 질문** (선택지 제시, 추천안 표시):
+  - 테이블 구조: 하나(`type` 컬럼으로 구분) / 둘(고정·커스텀 분리)
+  - 커스텀에 고정 확장자(`exe`) 입력 시: 거부하고 안내 / 고정 체크로 자동 전환
+  - 확장자 규칙: 영문 소문자·숫자만 허용 + 업로드 시 파일명의 모든 점 구간 검사 / 확장자 안의 점 허용(`tar.gz`)
+  - 변경 이력: 생성·수정 시각만 / 이력 테이블 추가
+- **선택**: 테이블 구조는 **사용자가 직접 DDL을 작성해서 답함** (`FILE_EXTENSION_POLICY`, 한 테이블, `TYPE` + `IS_BLOCKED`, `EXTENSION` UNIQUE, CHECK 제약). 나머지 3개는 추천안 선택
+- **AI 작업**: 사용자 DDL을 그대로 쓰고, 선택한 규칙을 DB에서도 강제하도록 제약 2개만 추가
+  - `CK_FILE_EXTENSION_FORMAT`: `REGEXP_LIKE(EXTENSION, '^[a-z0-9]{1,20}$', 'c')` — 앱 검증을 거치지 않은 값(대문자, 점, 공백, 유니코드)도 저장 불가. 기본 collation(`utf8mb4_unicode_ci`)이 대소문자를 구분하지 않아서 `'c'` 옵션으로 대소문자 구분 매칭
+  - `CK_FILE_EXTENSION_CUSTOM_BLOCKED`: 커스텀은 추가 = 차단이므로 `IS_BLOCKED = 1` 강제
+  - 엔진과 문자셋(`InnoDB`, `utf8mb4`) 명시
+  - `seed.sql`: 고정 확장자 7개를 `IS_BLOCKED = 0`(기본 체크 해제)으로 명시해서 입력. 컬럼 기본값(1)은 커스텀 추가용
+- **검증**: 로컬 DB에 `schema.sql` → `seed.sql` 적용 후 제약 테스트
+  - 실패해야 하는 10건 모두 거부 확인: 고정과 겹치는 `exe`(UNIQUE), `EXE2`·`.sh`·`tar.gz`·`한글`·빈 문자열(FORMAT), 잘못된 TYPE, 커스텀 `IS_BLOCKED = 0`, 21자(길이), `IS_BLOCKED = 2`
+  - 성공해야 하는 입력(커스텀 `sh`, 20자, 고정 `exe` 체크)은 트랜잭션 안에서 확인 후 롤백
+- **AI가 새로 발견한 점**: 로컬(Windows)의 `lower_case_table_names`가 1이라 테이블이 소문자(`file_extension_policy`)로 저장됨. AWS RDS 같은 Linux MySQL은 기본값이 0이라 테이블명이 대소문자를 구분함 → 로컬에서는 대소문자가 섞인 쿼리도 동작하지만 배포 환경에서는 실패할 수 있으므로, SQL에서 테이블명을 항상 `FILE_EXTENSION_POLICY`로 일관되게 쓰기로 함
+
 ---
 
 ## 2. 사용한 스킬 / 플러그인 / 도구
