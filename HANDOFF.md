@@ -5,7 +5,7 @@
 - 마지막 갱신: 2026-10-01
 - 저장소: https://github.com/vkfkd420/flow
 - 과제 원문: [과제_파일업로드_AI개발.md](과제_파일업로드_AI개발.md)
-- 상세 진행 기록: [PROMPT_LOG.md](PROMPT_LOG.md) (#1 ~ #19)
+- 상세 진행 기록: [PROMPT_LOG.md](PROMPT_LOG.md) (#1 ~ #20)
 
 ---
 
@@ -54,13 +54,16 @@
   - 개발 서버 `localhost:3000`, `/api`는 `localhost:8080`으로 프록시 (`vue.config.js`). 코드는 상대 경로 `/api`만 사용
   - 클라이언트 검증(정규화·중복·고정 겹침·200개·10MB)은 즉시 안내용, 최종 판단은 서버
   - 저장 실패 시 체크 상태 되돌림, 삭제 404 시 목록에서 제거(DB와 맞춤), 로딩 실패 시 다시 시도
+- [x] S3 실제 연동 (PROMPT_LOG #20) — 버킷 `min420-flow-uploads` (서울), IAM 사용자 `flow-app`
+  - 권한은 `uploads/*` PutObject만 (밖에 쓰기·목록·읽기·삭제 거부를 CLI로 확인)
+  - 한글 파일명 정상 저장 확인 (Windows Git Bash curl은 파일명을 CP949로 보내 깨지므로 테스트는 Node `fetch`나 브라우저로)
 
 ## 3. 다음에 할 것
 
-1. **S3 실제 연동 확인**: 버킷 생성(퍼블릭 액세스 차단), 앱 전용 IAM 사용자(`uploads/*` PutObject만), AWS CLI 설치 후 `aws configure`, `.env`에 `AWS_S3_BUCKET`
+1. **문서**: `CONSIDERATIONS.md` (과제 3번 항목 전체), `README.md` 실행 방법, `PROMPT_LOG.md` 회고
+2. **배포**: AWS.
    - 테이블명은 항상 대문자 `FILE_EXTENSION_POLICY` (Linux MySQL은 테이블명 대소문자 구분)
-2. **문서**: `CONSIDERATIONS.md` (과제 3번 항목 전체), `README.md` 실행 방법, `PROMPT_LOG.md` 회고
-3. **배포**: AWS. 앱 실행과 운영 MySQL에 쓸 서비스, 비용(무료 크레딧/프리 티어 조건)은 확인 필요. 면접 당일까지 접속 가능해야 함
+   - S3는 액세스 키 대신 앱 실행 환경의 IAM 역할에 같은 권한(`uploads/*` PutObject)을 부여 앱 실행과 운영 MySQL에 쓸 서비스, 비용(무료 크레딧/프리 티어 조건)은 확인 필요. 면접 당일까지 접속 가능해야 함
 
 ### 미정 / 확인 필요
 - AWS에서 사용할 서비스 구성 (앱 실행, 운영 DB)과 비용, 프론트 배포 방식 (Spring Boot에 포함 / S3+CloudFront 등)

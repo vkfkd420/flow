@@ -236,6 +236,20 @@ AI 활용 기록 (과제 4번 항목)
 - **확인했지만 손대지 않은 것**: 빌드 경고 `export 'default' (imported as 'style0') was not found`
   - 커밋된 스캐폴드 원본을 임시 폴더에서 빌드해 비교 → 원본에도 `<style>` 블록마다 같은 경고 → 이번 변경 때문이 아니고 CSS 결과물도 정상이라 범위 밖으로 두고 HANDOFF 미정 사항에 기록
 
+### #20 S3 실제 연동
+- **입력**: `CONSIDERATIONS.md 작성하자` → (중단) → `S3 연동해보자`
+- **AI 작업**: 준비 상태 확인(AWS CLI, `~/.aws`, `.env` 모두 없음) → winget으로 AWS CLI 2.37.6 설치
+  - 콘솔 작업(버킷, IAM 사용자, 액세스 키)과 `aws configure` 키 입력은 사용자가 직접 하도록 안내 — 액세스 키는 채팅으로 받지 않음
+  - 앱 IAM 사용자 권한은 `arn:aws:s3:::{버킷}/uploads/*`에 대한 `s3:PutObject`만 (키가 유출돼도 읽기·삭제·목록 조회 불가)
+- **입력**: `min420-flow-uploads` (버킷 이름)
+- **검증**:
+  - `aws sts get-caller-identity` → `user/flow-app`, 리전 `ap-northeast-2`
+  - **권한이 좁은지 확인** (거부되어야 하는 동작만 시험해서 버킷에 흔적을 남기지 않음): `uploads/` 밖 쓰기, 목록 조회, 읽기, 삭제, 퍼블릭 액세스 설정 조회 → 모두 거부
+  - `.env`에 `AWS_S3_BUCKET` 추가 후 앱으로 실제 업로드 → 201, `uploads/{UUID}`로 저장
+  - 한글 파일명이 깨짐(`S3 ���� Ȯ��.txt`) → 원인 확인: 같은 터미널에서 서버의 한글 응답 메시지는 정상 → Windows Git Bash의 curl이 파일명을 CP949 바이트로 보낸 것으로 판단. 브라우저처럼 UTF-8로 보내는 Node `fetch`로 다시 올려 `보고서 최종(1).txt`가 정상 저장되는 것 확인 → 앱 문제가 아니라 테스트 도구 문제
+  - `MZ` + 0으로 채운 `fake.jpg`는 통과 (PE 헤더가 없으므로 실행 파일 아님 → 오탐 없음을 실제로 확인), 진짜 PE를 `사진.jpg`로 위장한 파일은 S3에 가기 전에 `DISGUISED_EXECUTABLE`로 차단
+- **남은 확인** (앱 계정은 읽기 권한이 없어 사용자가 콘솔에서 확인): 퍼블릭 액세스 차단 설정, 업로드된 객체의 Content-Type·메타데이터, 테스트 객체 3개 정리
+
 ---
 
 ## 2. 사용한 스킬 / 플러그인 / 도구
@@ -247,6 +261,8 @@ AI 활용 기록 (과제 4번 항목)
 | Vue CLI 5 (`@vue/cli`) | frontend 생성 | 선택한 Vue 2 구성 |
 | AWS SDK for Java v2 (`s3` 2.55.8) | 업로드 파일 S3 저장 | 배포처 AWS에 맞춰 선택, 자격 증명 기본 체인 사용 |
 | Mockito `@MockitoBean` | 업로드 API 테스트 | 버킷 없이 S3 호출 여부·요청 내용(키, Content-Type) 검증 |
+| AWS CLI 2.37.6 | S3 권한 확인 | 앱 IAM 사용자가 `uploads/*` 쓰기 외에는 거부되는지 직접 확인 |
+| Node.js `fetch` | 한글 파일명 업로드 확인 | Windows curl이 파일명을 CP949로 보내는 문제를 피해 브라우저와 같은 UTF-8 전송으로 검증 |
 | axios 1.20 | 프론트 API 호출 | 사용자 선택. 업로드 진행률(`onUploadProgress`) 표시 |
 | Claude 내장 브라우저 (Browser pane) | 프론트 화면 동작 확인 | 실제 화면 조작, 장애 상황(백엔드 중지) 재현, 모바일 폭 확인 |
 | winget | JDK 17, Node.js 22 설치 | Windows 기본 패키지 관리자로 버전 고정 설치 |
