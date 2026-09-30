@@ -156,6 +156,39 @@ AI 활용 기록 (과제 4번 항목)
   - 성공해야 하는 입력(커스텀 `sh`, 20자, 고정 `exe` 체크)은 트랜잭션 안에서 확인 후 롤백
 - **AI가 새로 발견한 점**: 로컬(Windows)의 `lower_case_table_names`가 1이라 테이블이 소문자(`file_extension_policy`)로 저장됨. AWS RDS 같은 Linux MySQL은 기본값이 0이라 테이블명이 대소문자를 구분함 → 로컬에서는 대소문자가 섞인 쿼리도 동작하지만 배포 환경에서는 실패할 수 있으므로, SQL에서 테이블명을 항상 `FILE_EXTENSION_POLICY`로 일관되게 쓰기로 함
 
+### #16 확장자 정책 API (첫 번째 컴퓨터로 복귀)
+- **입력**: `안녕 다른컴퓨터에서 조금하다가 돌아왔어 파일이 수정되었을테니 확인해봐`
+- **AI 작업**: `git fetch`와 커밋 diff로 다른 컴퓨터 작업(#10~#15) 확인
+  - 이 컴퓨터 DB에는 스키마가 적용되지 않은 상태, HANDOFF의 기록 범위 표기(#1 ~ #11)가 실제(#15)와 다름을 발견해 보고
+- **입력**: `자 이어서 해보자`
+- **AI 작업 1**: 이 컴퓨터 DB에 `schema.sql` → `seed.sql` 적용, 핵심 제약 3건(형식, 고정과 중복, 커스텀 허용 금지) 거부 확인. HANDOFF 기록 범위 수정
+- **AI 질문** (선택지 + 미리보기): API 설계안 / 에러 응답 형식 `{ code, message }` vs ProblemDetail / 입력 앞의 점을 하나만 제거 vs 모두 제거 (스키마 주석이 "앞의 '.' 제거"라고만 되어 있어 해석이 두 가지)
+- **선택**: 모두 추천안 (설계안 그대로, `{ code, message }`, 점 하나만 제거)
+- **AI 작업 2**: Controller → Service(@Transactional) → MyBatis Mapper(XML) 구조로 구현
+  - `ExtensionRule`: 정규화 규칙을 한 곳에 둠 (strip → 앞의 점 하나 제거 → `toLowerCase(Locale.ROOT)` → `^[a-z0-9]{1,20}$`). DB CHECK와 같은 규칙. 업로드 검사에서 재사용 예정
+    - `Locale.ROOT`: 터키어 로케일 등에서 `I`의 소문자 변환 결과가 달라지는 문제 방지
+    - `strip()`: `trim()`과 달리 유니코드 공백도 제거
+  - 200개 제한: 트랜잭션 안에서 `SELECT COUNT(*) ... WHERE TYPE = 'CUSTOM' FOR UPDATE`로 먼저 잠근 뒤 중복·개수 확인 → INSERT. InnoDB 기본 격리 수준(REPEATABLE READ)에서 조회 범위의 간격(gap)까지 잠겨 동시 INSERT가 대기함
+  - 중복 추가: 먼저 조회해서 고정 확장자와 겹침(`FIXED_EXTENSION_CONFLICT`)과 커스텀 중복(`DUPLICATE_EXTENSION`)을 구분해 안내. UNIQUE 위반(`DuplicateKeyException`)도 같은 메시지로 변환 (최종 방어선)
+  - 고정 변경/커스텀 삭제는 `WHERE ... AND TYPE = ?`로 종류를 제한 → 커스텀 삭제 API로 고정 확장자를 지울 수 없음
+  - 예외 처리: 업무 예외는 `{ code, message }`, 없는 경로(404)·잘못된 메서드(405)·잘못된 ID 형식(400)이 500으로 떨어지지 않도록 처리 (구현 중 AI가 스스로 발견해 보완)
+- **검증**: 테스트 34개 통과
+  - `ExtensionRuleTest` (22건): 대소문자, 공백, 앞의 점, 20/21자, `..sh`, `tar.gz`, `../sh`, 한글, 전각 문자(`ｅｘｅ`) 등
+  - `ExtensionPolicyApiTest` (10건, 테스트마다 롤백): 조회, 고정 체크 저장, 404/400, 정규화 저장 후 삭제, 중복 409, 고정과 겹침 409, 커스텀 삭제 API로 고정 삭제 불가, 잘못된 경로/ID
+  - `ExtensionPolicyConcurrencyTest`: 남은 자리가 1개일 때 10건 동시 추가 → 1건만 성공, 9건 `CUSTOM_LIMIT_EXCEEDED`
+  - **테스트 자체 검증**: `FOR UPDATE`를 임시로 빼고 3회 실행 → 3회 모두 10건이 다 성공(총 209개)하며 테스트 실패. 잠금을 되돌리면 다시 통과 → 테스트가 경쟁 상태를 실제로 잡아낸다는 것을 확인
+
+### #17 백엔드 패키지 구조 변경
+- **입력**: `구조가 controller, service, dto, dao, mapper 패키지로 나눠져 있어야지`
+- **AI 판단**: AI는 기능 단위 패키지(`com.flow.extension`)로 만들었지만 사용자는 레이어 단위를 원함. `dao`와 `mapper`의 역할 구분이 여러 가지로 해석되어 3가지 안을 미리보기로 제시
+  - dao = 클래스, mapper = 인터페이스 / dao = VO, mapper = 인터페이스 / dao = 인터페이스, mapper = XML
+- **선택**: **dao = `@Mapper` 인터페이스, mapper = XML** (`resources/mapper/ExtensionPolicyDao.xml`)
+- **AI 작업**: 로직은 그대로 두고 파일 이동과 package/import만 수정
+  - `controller`, `service`, `dao`(`ExtensionPolicyMapper` → `ExtensionPolicyDao`), `dto`(요청/응답 DTO + DB 행 `ExtensionPolicy`), `common`(예외 처리 + `ExtensionRule`)
+  - 테스트도 같은 패키지로 이동, Service의 필드명을 타입에 맞춰 `mapper` → `dao`
+- **문제와 해결**: 이동 후 테스트 실행 시 컨텍스트 로딩 실패. 원인은 코드가 아니라 `target/classes`에 이름을 바꾸기 전의 `ExtensionPolicyMapper.xml`이 남아 MyBatis가 옛 XML까지 읽은 것 → `mvnw clean test`로 해결
+- **검증**: `clean test` 34개 통과, 빌드 결과물에 새 XML만 있는 것 확인
+
 ---
 
 ## 2. 사용한 스킬 / 플러그인 / 도구

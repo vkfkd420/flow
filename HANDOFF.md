@@ -2,10 +2,10 @@
 
 다른 컴퓨터(또는 새 Claude Code 세션)에서 작업을 이어가기 위한 문서입니다.
 
-- 마지막 갱신: 2026-09-30
+- 마지막 갱신: 2026-10-01
 - 저장소: https://github.com/vkfkd420/flow
 - 과제 원문: [과제_파일업로드_AI개발.md](과제_파일업로드_AI개발.md)
-- 상세 진행 기록: [PROMPT_LOG.md](PROMPT_LOG.md) (#1 ~ #11)
+- 상세 진행 기록: [PROMPT_LOG.md](PROMPT_LOG.md) (#1 ~ #17)
 
 ---
 
@@ -20,6 +20,7 @@
 | DB 관리 | DBeaver | |
 | 배포 | AWS | 사용할 서비스(앱 실행, DB)는 미정 |
 | 패키지명 | `com.flow` | |
+| 백엔드 패키지 구조 | `controller`, `service`, `dao`(@Mapper 인터페이스), `dto`(요청/응답 + DB 행), `common` | MyBatis XML은 `resources/mapper/{Dao 이름}.xml` |
 | 고정 확장자 | **체크 = 차단** | 기본값은 모두 해제 |
 | 인증 | 없음 (추후 고려) | 공개 배포 시 누구나 정책 변경 가능 → CONSIDERATIONS에 기록 예정 |
 | 접속 정보 | `backend/.env` (Git 제외) 또는 OS 환경 변수 | `backend/.env.example` 참고 |
@@ -40,17 +41,20 @@
 - [x] 두 번째 컴퓨터 환경 구성: JDK 17 (사용자 `JAVA_HOME` 17로 변경), MySQL 8.4.9, `backend/.env`, 연결 확인 (PROMPT_LOG #10~#14)
 - [x] 테이블 스키마: `FILE_EXTENSION_POLICY` 한 테이블 (`TYPE` FIXED/CUSTOM, `IS_BLOCKED`), `EXTENSION` UNIQUE, 형식 CHECK(`^[a-z0-9]{1,20}$`), 로컬 DB 적용 및 제약 테스트 (PROMPT_LOG #15)
   - 커스텀에 고정 확장자 입력 시 거부하고 안내 / 업로드 시 파일명의 모든 점 구간 검사 / 이력은 생성·수정 시각만
+- [x] 확장자 정책 API (PROMPT_LOG #16, 패키지 구조 #17) — 테스트 34개 통과
+  - `GET /api/extensions`, `PATCH /api/extensions/fixed/{extension}`, `POST /api/extensions/custom`, `DELETE /api/extensions/custom/{id}`
+  - 에러 응답은 `{ code, message }` (message는 화면에 그대로 표시), 입력 앞의 점은 하나만 제거
+  - 200개 제한은 `SELECT COUNT(*) ... FOR UPDATE` 잠금으로 직렬화 (동시성 테스트로 확인)
+  - 정규화 규칙은 `ExtensionRule` 한 곳에 있음 → 업로드 검사에서도 재사용
 
 ## 3. 다음에 할 것
 
-1. **백엔드 API**: 정책 조회, 고정 확장자 체크 변경, 커스텀 추가/삭제 (20자, 200개 제한, 중복 방지)
-   - 200개 제한은 DB 제약으로 못 막으므로 동시 요청 시 초과하지 않도록 락 처리
+1. **파일 업로드 API**: 서버 측 정책 강제, 차단 사유 반환, 안전한 저장 (원본 파일명 사용 금지 등)
    - 테이블명은 항상 대문자 `FILE_EXTENSION_POLICY` (Linux MySQL은 테이블명 대소문자 구분)
-2. **파일 업로드 API**: 서버 측 정책 강제, 차단 사유 반환, 안전한 저장 (원본 파일명 사용 금지 등)
-3. **프론트 화면**: 정책 관리 화면 + 업로드 화면, 로딩/에러 처리
-4. **테스트**: 확장자 검증 로직 중심
-5. **문서**: `CONSIDERATIONS.md` (과제 3번 항목 전체), `README.md` 실행 방법, `PROMPT_LOG.md` 회고
-6. **배포**: AWS. 앱 실행과 운영 MySQL에 쓸 서비스, 비용(무료 크레딧/프리 티어 조건)은 확인 필요. 면접 당일까지 접속 가능해야 함
+2. **프론트 화면**: 정책 관리 화면 + 업로드 화면, 로딩/에러 처리
+3. **테스트**: 업로드 검증 로직 (정책 API 테스트는 완료)
+4. **문서**: `CONSIDERATIONS.md` (과제 3번 항목 전체), `README.md` 실행 방법, `PROMPT_LOG.md` 회고
+5. **배포**: AWS. 앱 실행과 운영 MySQL에 쓸 서비스, 비용(무료 크레딧/프리 티어 조건)은 확인 필요. 면접 당일까지 접속 가능해야 함
 
 ### 미정 / 확인 필요
 - AWS에서 사용할 서비스 구성 (앱 실행, 운영 DB)과 비용

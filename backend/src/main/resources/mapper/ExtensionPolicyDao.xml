@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- 테이블명은 항상 대문자 FILE_EXTENSION_POLICY (Linux MySQL은 테이블명 대소문자 구분) -->
+<mapper namespace="com.flow.dao.ExtensionPolicyDao">
+
+	<resultMap id="policy" type="com.flow.dto.ExtensionPolicy">
+		<constructor>
+			<idArg column="ID" javaType="java.lang.Long"/>
+			<arg column="EXTENSION" javaType="java.lang.String"/>
+			<arg column="TYPE" javaType="java.lang.String"/>
+			<arg column="IS_BLOCKED" javaType="_boolean"/>
+		</constructor>
+	</resultMap>
+
+	<select id="findAll" resultMap="policy">
+		SELECT ID, EXTENSION, TYPE, IS_BLOCKED
+		  FROM FILE_EXTENSION_POLICY
+		 ORDER BY ID
+	</select>
+
+	<select id="findByExtension" resultMap="policy">
+		SELECT ID, EXTENSION, TYPE, IS_BLOCKED
+		  FROM FILE_EXTENSION_POLICY
+		 WHERE EXTENSION = #{extension}
+	</select>
+
+	<!--
+		커스텀 추가를 직렬화하기 위한 잠금.
+		InnoDB 기본 격리 수준(REPEATABLE READ)에서 조회 범위의 행과 간격(gap)까지 잠기므로,
+		트랜잭션이 끝날 때까지 다른 트랜잭션의 커스텀 INSERT가 대기한다.
+	-->
+	<select id="countCustomForUpdate" resultType="int">
+		SELECT COUNT(*)
+		  FROM FILE_EXTENSION_POLICY
+		 WHERE TYPE = 'CUSTOM'
+		   FOR UPDATE
+	</select>
+
+	<insert id="insertCustom">
+		INSERT INTO FILE_EXTENSION_POLICY (EXTENSION, TYPE, IS_BLOCKED)
+		VALUES (#{extension}, 'CUSTOM', 1)
+	</insert>
+
+	<update id="updateFixedBlocked">
+		UPDATE FILE_EXTENSION_POLICY
+		   SET IS_BLOCKED = #{blocked}
+		 WHERE EXTENSION = #{extension}
+		   AND TYPE = 'FIXED'
+	</update>
+
+	<delete id="deleteCustom">
+		DELETE FROM FILE_EXTENSION_POLICY
+		 WHERE ID = #{id}
+		   AND TYPE = 'CUSTOM'
+	</delete>
+</mapper>
