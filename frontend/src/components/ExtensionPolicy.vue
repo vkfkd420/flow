@@ -117,7 +117,7 @@ export default {
       try {
         const saved = await updateFixed(item.extension, blocked)
         item.blocked = saved.blocked
-        this.notify('success', `'${item.extension}' ${saved.blocked ? '차단' : '차단 해제'}를 저장했습니다.`)
+        this.notify('success', `'${item.extension}' ${saved.blocked ? '차단을' : '차단 해제를'} 저장했습니다.`)
       } catch (e) {
         // 저장에 실패하면 체크 상태를 DB 값(변경 전)으로 되돌린다
         item.blocked = !blocked

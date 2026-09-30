@@ -73,6 +73,16 @@
 	</dependencies>
 
 	<build>
+		<resources>
+			<resource>
+				<directory>src/main/resources</directory>
+			</resource>
+			<!-- 배포 시 프론트 빌드 결과를 jar의 static/에 포함 (dist가 없으면 건너뜀) -->
+			<resource>
+				<directory>../frontend/dist</directory>
+				<targetPath>static</targetPath>
+			</resource>
+		</resources>
 		<plugins>
 			<plugin>
 				<groupId>org.springframework.boot</groupId>

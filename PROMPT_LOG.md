@@ -250,6 +250,43 @@ AI 활용 기록 (과제 4번 항목)
   - `MZ` + 0으로 채운 `fake.jpg`는 통과 (PE 헤더가 없으므로 실행 파일 아님 → 오탐 없음을 실제로 확인), 진짜 PE를 `사진.jpg`로 위장한 파일은 S3에 가기 전에 `DISGUISED_EXECUTABLE`로 차단
 - **남은 확인** (앱 계정은 읽기 권한이 없어 사용자가 콘솔에서 확인): 퍼블릭 액세스 차단 설정, 업로드된 객체의 Content-Type·메타데이터, 테스트 객체 3개 정리
 
+### #21 AWS 실제 배포
+- **입력**: `CONSIDERATIONS.md 작성하기전에 전체적으로 실제배포하고 확인하고싶어`
+- **AI 질문** (선택지 + 구성도 미리보기): 구성(EC2 + RDS / EC2에 MySQL까지 / Elastic Beanstalk), 무료 혜택 종류, 리소스 생성 주체(AI가 CLI로 / 직접 콘솔), HTTPS 여부
+- **선택**: **EC2 1대 + RDS MySQL**, 2025년 7월 이후 가입(크레딧 방식), **AI가 CLI로**, HTTP로 시작 (모두 추천안)
+  - 프론트는 Spring Boot jar에 포함 → 도메인 하나, CORS 불필요, 프론트 코드는 상대 경로 `/api` 그대로
+- **배포용 IAM 사용자 `flow-deploy`** (사용자가 콘솔에서 생성): EC2·RDS 관리형 정책 + 인라인 정책(`flow-*` 역할만 생성/전달, 가격 조회)
+  - 사용자가 붙여 넣은 인라인 정책에 콘솔 경고 발생 → AI가 원인을 추측(PassRole 와일드카드, 역할 전용 동작에 instance-profile ARN 혼재)하고 수정안 제시: 문장 분리, 계정 ID 명시, `iam:PassedToService = ec2.amazonaws.com` 조건 → 경고 해소
+- **비밀번호**: 사용자가 `~/.flow-deploy.env`(저장소 밖)에 직접 작성, AI는 길이·금지 문자만 확인하고 값은 출력하지 않음
+  - 처음 4자 → RDS 관리자 비밀번호는 AWS 규칙상 최소 8자라 생성 불가함을 안내 → 사용자가 사용자 결정으로 앱 계정은 유지하려 했으나 최종적으로 둘 다 11자로 변경
+- **비용 확인 후 승인**: Pricing API로 서울 리전 실제 단가 조회 → EC2 `t4g.micro` $0.0104/h, RDS `db.t4g.micro` $0.025/h, RDS gp3 $0.131/GB-월, EBS gp3 $0.0912/GB-월, 퍼블릭 IPv4 $0.005/h → **월 약 $32.8** 제시 후 사용자 승인
+  - `t4g`(ARM)를 고른 이유: `t3.micro`($0.013/h)보다 약 20% 저렴, Java 17은 ARM에서 문제없음
+- **생성한 리소스** (모두 태그 `Project=flow`, 기본 VPC):
+  - 보안 그룹 `flow-ec2-sg`(80 전체, 22는 관리자 IP /32만), `flow-rds-sg`(3306은 `flow-ec2-sg`에서만)
+  - 키 페어 `flow-key`(ed25519, `~/.ssh`에만 보관), IAM 역할 `flow-ec2-role`(S3 `uploads/*` PutObject만)
+  - RDS `flow-db` (MySQL 8.4.11, 퍼블릭 접근 없음, 스토리지 암호화, 백업 1일), EC2 `flow-app` (AL2023 ARM, IMDSv2 필수, EBS 암호화), Elastic IP
+- **배포 구성** (`deploy/`):
+  - `ec2-userdata.sh`: 최초 부팅 시 Java 17·MySQL 클라이언트 설치, 스왑 1GB(메모리 1GB 보완), 로그인 불가 실행 계정 `flow`
+  - `build.sh`: 프론트 빌드 → `pom.xml`의 리소스 설정으로 `frontend/dist`를 jar의 `static/`에 포함(없으면 건너뜀) → 테스트 포함 패키징
+  - `flow.service`(systemd): `flow` 계정으로 실행, `CAP_NET_BIND_SERVICE`로 root 없이 80 포트, 자동 재시작
+  - `deploy.sh`: jar와 서비스 파일 업로드 후 재시작
+  - `/etc/flow/flow.env`(root만 읽기): DB 접속 정보(`sslMode=REQUIRED`), 포트, 버킷 — 저장소에 없음
+- **DB 초기화** (EC2를 거쳐 RDS에 적용, 비밀번호는 SSH 표준 입력으로만 전달):
+  - 앱 계정은 **`SELECT/INSERT/UPDATE/DELETE`만**, 접속 호스트는 VPC 내부(`172.31.%`)만 → 테이블 구조 변경은 관리자 계정으로만
+  - RDS는 `lower_case_table_names = 0`이라 테이블이 대문자 `FILE_EXTENSION_POLICY`로 저장됨을 확인 (로컬 Windows는 소문자) → #15에서 정한 "테이블명 항상 대문자" 규칙이 실제로 필요했음
+- **진행 중 부딪힌 문제** (모두 Windows 환경에서 `aws.exe`를 Git Bash로 쓰면서 생김):
+  1. `--user-data file:///tmp/...` → `aws.exe`가 Git Bash 경로를 못 찾음 → 이때 뒤 명령이 빈 인스턴스 ID로 대기 → AI가 중단하고 남은 리소스가 없는지 태그로 확인
+  2. Windows 경로로 바꾸자 한글 주석 때문에 CP949로 디코딩 실패 → `fileb://`(바이트 그대로)로 해결
+  3. `DeviceName=/dev/xvda`를 Git Bash가 `D:/Git/dev/xvda`로 자동 변환 → `MSYS_NO_PATHCONV=1`로 해결
+  4. SSH 키 `invalid format` → CRLF는 없었고, `sed`로 파일을 다시 쓰자 해결됨 → 파일 끝 줄바꿈 누락으로 추정 (확실하지 않음)
+- **검증** (공개 URL `http://43.202.189.27`, 내장 브라우저):
+  - 정책: `exe` 체크 → 재조회 시 유지, `.SH` → `sh` 추가(1/200)
+  - 업로드: `배포 확인.txt` **EC2 IAM 역할로 S3 저장 성공**(액세스 키 없음), `setup.exe`·`run.sh` 차단, PE를 `photo.png`로 위장 → 차단. 서버 로그에 성공·차단 사유 기록 확인
+  - 네트워크: 외부에서 RDS 3306, EC2 8080 접속 불가
+  - **재부팅 후 26초 만에 자동 복구** (systemd enabled, 스왑 유지)
+  - 확인 중 발견한 문구 오류 `'exe' 차단를 저장했습니다`(조사) → `차단을` / `차단 해제를`로 수정, 재배포 후 확인
+  - 테스트로 바꾼 정책(`exe` 체크, `sh`)은 seed 상태로 되돌림
+
 ---
 
 ## 2. 사용한 스킬 / 플러그인 / 도구
@@ -263,6 +300,9 @@ AI 활용 기록 (과제 4번 항목)
 | Mockito `@MockitoBean` | 업로드 API 테스트 | 버킷 없이 S3 호출 여부·요청 내용(키, Content-Type) 검증 |
 | AWS CLI 2.37.6 | S3 권한 확인 | 앱 IAM 사용자가 `uploads/*` 쓰기 외에는 거부되는지 직접 확인 |
 | Node.js `fetch` | 한글 파일명 업로드 확인 | Windows curl이 파일명을 CP949로 보내는 문제를 피해 브라우저와 같은 UTF-8 전송으로 검증 |
+| AWS Pricing API | 배포 전 비용 추정 | 추측이 아닌 서울 리전 실제 단가로 월 비용 제시 |
+| AWS CLI (EC2, RDS, IAM) | 배포 인프라 생성 | 명령이 그대로 기록되어 재현 가능, 태그로 리소스 추적 |
+| systemd, OpenSSH | 앱 상시 실행, 배포 | 재부팅 자동 복구, root 없이 80 포트 |
 | axios 1.20 | 프론트 API 호출 | 사용자 선택. 업로드 진행률(`onUploadProgress`) 표시 |
 | Claude 내장 브라우저 (Browser pane) | 프론트 화면 동작 확인 | 실제 화면 조작, 장애 상황(백엔드 중지) 재현, 모바일 폭 확인 |
 | winget | JDK 17, Node.js 22 설치 | Windows 기본 패키지 관리자로 버전 고정 설치 |

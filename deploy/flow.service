@@ -1,0 +1,18 @@
+[Unit]
+Description=flow (file extension policy & upload)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=flow
+WorkingDirectory=/opt/flow
+# DB 접속 정보, 포트, S3 버킷 (root만 읽을 수 있는 파일, 저장소에 없음)
+EnvironmentFile=/etc/flow/flow.env
+ExecStart=/usr/bin/java -Xms256m -Xmx512m -jar /opt/flow/app.jar
+# root가 아닌 계정으로 80 포트 사용
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

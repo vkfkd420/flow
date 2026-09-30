@@ -5,7 +5,7 @@
 - 마지막 갱신: 2026-10-01
 - 저장소: https://github.com/vkfkd420/flow
 - 과제 원문: [과제_파일업로드_AI개발.md](과제_파일업로드_AI개발.md)
-- 상세 진행 기록: [PROMPT_LOG.md](PROMPT_LOG.md) (#1 ~ #20)
+- 상세 진행 기록: [PROMPT_LOG.md](PROMPT_LOG.md) (#1 ~ #21)
 
 ---
 
@@ -18,7 +18,7 @@
 | DB 접근 | MyBatis 4.0.1 | JPA 대신 선택 (스키마와 SQL이 1:1로 드러나도록) |
 | DB | MySQL 8.4 (로컬 8.4.9) | 처음엔 Oracle(OCI)로 정했다가 MySQL로 변경 |
 | DB 관리 | DBeaver | |
-| 배포 | AWS | 사용할 서비스(앱 실행, DB)는 미정 |
+| 배포 | AWS: EC2 1대(Spring Boot + 프론트 포함) + RDS MySQL, HTTP | 아래 5번 참고. HTTPS는 필요 시 CloudFront 추가 |
 | 패키지명 | `com.flow` | |
 | 백엔드 패키지 구조 | `controller`, `service`, `dao`(@Mapper 인터페이스), `dto`(요청/응답 + DB 행), `common` | MyBatis XML은 `resources/mapper/{Dao 이름}.xml` |
 | 고정 확장자 | **체크 = 차단** | 기본값은 모두 해제 |
@@ -58,15 +58,15 @@
   - 권한은 `uploads/*` PutObject만 (밖에 쓰기·목록·읽기·삭제 거부를 CLI로 확인)
   - 한글 파일명 정상 저장 확인 (Windows Git Bash curl은 파일명을 CP949로 보내 깨지므로 테스트는 Node `fetch`나 브라우저로)
 
+- [x] AWS 배포 (PROMPT_LOG #21) — **http://43.202.189.27** (면접 당일까지 유지)
+  - 공개 URL에서 정책 변경·업로드·차단·S3 저장(IAM 역할) 확인, 재부팅 후 자동 복구 확인
+  - 테이블명은 항상 대문자 `FILE_EXTENSION_POLICY` (RDS는 `lower_case_table_names = 0`)
+
 ## 3. 다음에 할 것
 
-1. **문서**: `CONSIDERATIONS.md` (과제 3번 항목 전체), `README.md` 실행 방법, `PROMPT_LOG.md` 회고
-2. **배포**: AWS.
-   - 테이블명은 항상 대문자 `FILE_EXTENSION_POLICY` (Linux MySQL은 테이블명 대소문자 구분)
-   - S3는 액세스 키 대신 앱 실행 환경의 IAM 역할에 같은 권한(`uploads/*` PutObject)을 부여 앱 실행과 운영 MySQL에 쓸 서비스, 비용(무료 크레딧/프리 티어 조건)은 확인 필요. 면접 당일까지 접속 가능해야 함
+1. **문서**: `CONSIDERATIONS.md` (과제 3번 항목 전체), `README.md` 실행 방법·스키마·배포, `PROMPT_LOG.md` 회고
 
 ### 미정 / 확인 필요
-- AWS에서 사용할 서비스 구성 (앱 실행, 운영 DB)과 비용, 프론트 배포 방식 (Spring Boot에 포함 / S3+CloudFront 등)
 - 프론트 빌드 경고 `export 'default' (imported as 'style0') was not found`: `<style>` 블록마다 발생, 스캐폴드 원본에도 있음(webpack 5.111 + vue-loader 15 조합으로 추정). CSS 결과물은 정상
 
 ---
@@ -142,3 +142,40 @@ npm run serve
 새 세션을 시작할 때는 이렇게 요청하면 됩니다.
 
 > HANDOFF.md와 PROMPT_LOG.md 읽고 이어서 작업하자
+
+---
+
+## 5. 배포 환경 (AWS, 서울 리전)
+
+- URL: http://43.202.189.27 (Elastic IP, 고정)
+- 예상 비용: 월 약 $32.8 (크레딧 차감) — EC2 $7.6, RDS $18.3, RDS 스토리지 $2.6, EBS $0.7, 퍼블릭 IPv4 $3.7
+
+### 리소스 (모두 태그 `Project=flow`)
+
+| 리소스 | 이름/ID | 설정 |
+|--------|---------|------|
+| EC2 | `flow-app` (`i-020284f62d2094fbf`) | `t4g.micro`, Amazon Linux 2023 ARM, IMDSv2 필수, EBS 8GB 암호화 |
+| RDS | `flow-db` | MySQL 8.4.11, `db.t4g.micro`, gp3 20GB, 퍼블릭 접근 없음, 암호화, 백업 1일 |
+| 보안 그룹 | `flow-ec2-sg` / `flow-rds-sg` | 80 전체 + 22 관리자 IP만 / 3306은 `flow-ec2-sg`에서만 |
+| IAM 역할 | `flow-ec2-role` | S3 `min420-flow-uploads/uploads/*` PutObject만 |
+| 키 페어 | `flow-key` | `~/.ssh/flow-key.pem` (저장소에 없음) |
+| S3 | `min420-flow-uploads` | 퍼블릭 액세스 차단 |
+
+### 서버 구성
+- 앱: `/opt/flow/app.jar`, systemd `flow` 서비스 (`deploy/flow.service`), 실행 계정 `flow`(로그인 불가), 80 포트
+- 환경 변수: `/etc/flow/flow.env` (root만 읽기) — `SERVER_PORT`, `DB_URL`(`sslMode=REQUIRED`), `DB_USERNAME`, `DB_PASSWORD`, `AWS_REGION`, `AWS_S3_BUCKET`
+- DB 앱 계정: `flow@172.31.%` (`SELECT/INSERT/UPDATE/DELETE`만). 관리자 `admin`은 스키마 변경용
+- 로그: `sudo journalctl -u flow`
+
+### 다시 배포하기 (코드 변경 후)
+
+```bash
+bash deploy/build.sh
+bash deploy/deploy.sh 43.202.189.27
+```
+
+- SSH(22)는 관리자 IP만 허용. 다른 곳에서 배포하려면 `flow-ec2-sg`에 현재 IP 추가 필요
+- `deploy.sh`는 SSH만 사용하므로 `flow-deploy` 액세스 키가 없어도 됨 (인프라 변경 시에만 필요)
+
+### 정리 (과제 종료 후)
+태그 `Project=flow` 리소스 삭제: EC2 종료 → Elastic IP 해제 → RDS 삭제 → 보안 그룹 → IAM 역할/인스턴스 프로필 → 키 페어. Elastic IP는 인스턴스에서 떼어낸 뒤에도 과금되므로 반드시 해제
