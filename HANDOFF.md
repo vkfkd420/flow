@@ -5,7 +5,7 @@
 - 마지막 갱신: 2026-10-01
 - 저장소: https://github.com/vkfkd420/flow
 - 과제 원문: [과제_파일업로드_AI개발.md](과제_파일업로드_AI개발.md)
-- 상세 진행 기록: [PROMPT_LOG.md](PROMPT_LOG.md) (#1 ~ #21)
+- 상세 진행 기록: [PROMPT_LOG.md](PROMPT_LOG.md) (#1 ~ #22)
 
 ---
 

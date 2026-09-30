@@ -287,6 +287,15 @@ AI 활용 기록 (과제 4번 항목)
   - 확인 중 발견한 문구 오류 `'exe' 차단를 저장했습니다`(조사) → `차단을` / `차단 해제를`로 수정, 재배포 후 확인
   - 테스트로 바꾼 정책(`exe` 체크, `sh`)은 seed 상태로 되돌림
 
+### #22 배포 파일 줄바꿈 LF 고정
+- **AI가 발견**: #21 커밋 시 `deploy/*.sh`, `flow.service`에 "LF가 CRLF로 바뀐다" 경고 → 이 PC는 `core.autocrlf=true`라 다른 Windows PC에서 clone하면 CRLF로 받아지고, 그대로 EC2에 올리면 `$'\r': command not found` 등으로 실패할 수 있음 → 사용자에게 제안
+- **입력**: `응 수정하고 커밋 push해줘`
+- **AI 작업**: 루트 `.gitattributes`에 `*.sh`, `*.service`를 `text eol=lf`로 지정 (`backend/.gitattributes`의 `mvnw` 처리와 같은 방식)
+- **검증 중 AI가 스스로 틀린 부분**: 새로 clone한 뒤 `grep -c $'\r'`로 확인 → 모든 파일(설정이 원래 있던 `mvnw`까지)이 CRLF로 나와 수정이 안 먹은 것처럼 보임
+  - `mvnw`까지 CRLF라는 점이 이상해 다른 방법으로 재확인 → `git ls-files --eol`에서 `w/lf`, `od -c`로도 줄 끝이 `\n`뿐 → **설정은 정상이었고 확인 방법(Git Bash의 grep CR 패턴 처리)이 잘못된 것**
+  - 이후 줄바꿈 확인은 `git ls-files --eol`로 함. #21의 SSH 키 CRLF 확인도 같은 방법이라 그때 결론("CRLF 없음")도 신뢰하기 어려움 → 원인은 여전히 미확정
+- **최종 확인**: 새 clone에서 `deploy/` 4개와 `mvnw`는 `w/lf`, 설정 대상이 아닌 `README.md`는 `w/crlf`
+
 ---
 
 ## 2. 사용한 스킬 / 플러그인 / 도구
