@@ -32,7 +32,7 @@ public enum ErrorCode {
 	EMPTY_FILE(BAD_REQUEST, "빈 파일은 업로드할 수 없습니다."),
 	UNREADABLE_FILE(BAD_REQUEST, "파일을 읽을 수 없습니다. 다시 시도해 주세요."),
 	BLOCKED_EXTENSION(BAD_REQUEST, "'%s' 확장자는 업로드가 차단되어 있습니다."),
-	DISGUISED_EXECUTABLE(BAD_REQUEST, "파일 내용은 %s인데 %s 이를 숨기고 있어 업로드할 수 없습니다."),
+	DISGUISED_EXECUTABLE(BAD_REQUEST, "파일 내용은 %s인데 %s 업로드할 수 없습니다."),
 	FILE_TOO_LARGE(PAYLOAD_TOO_LARGE, "파일은 최대 %dMB까지 업로드할 수 있습니다."),
 	STORAGE_UNAVAILABLE(SERVICE_UNAVAILABLE, "파일 저장소에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.");
 

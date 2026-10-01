@@ -61,7 +61,7 @@ public class FileUploadService {
 		String lastExtension = extensions.isEmpty() ? null : extensions.get(extensions.size() - 1);
 		ExecutableSignature signature = ExecutableSignature.detect(readHead(file));
 		if (signature != null && !signature.matchesExtension(lastExtension)) {
-			String disguise = lastExtension == null ? "확장자가 없어" : "확장자(" + lastExtension + ")가";
+			String disguise = lastExtension == null ? "확장자가 없어" : "확장자(" + lastExtension + ")와 맞지 않아";
 			throw reject(ErrorCode.DISGUISED_EXECUTABLE, name, signature.label(), disguise);
 		}
 
