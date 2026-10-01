@@ -5,7 +5,7 @@
 - 마지막 갱신: 2026-10-01
 - 저장소: https://github.com/vkfkd420/flow
 - 과제 원문: [과제_파일업로드_AI개발.md](과제_파일업로드_AI개발.md)
-- 상세 진행 기록: [PROMPT_LOG.md](PROMPT_LOG.md) (#1 ~ #25)
+- 상세 진행 기록: [PROMPT_LOG.md](PROMPT_LOG.md) (#1 ~ #26)
 
 ---
 
@@ -63,12 +63,14 @@
   - 테이블명은 항상 대문자 `FILE_EXTENSION_POLICY` (RDS는 `lower_case_table_names = 0`)
 
 - [x] 실행 가이드 `SETUP.md`, 자동 설정 `setup.ps1`, 과금 정리 가이드 `CLEANUP.md` (PROMPT_LOG #23, #24)
+- [x] `CONSIDERATIONS.md` (PROMPT_LOG #26) — 과제 3번 전 항목 + 과제 목록에 없던 11개, 마지막에 "확인했지만 고치지 않은 것" 표
+  - 작성 중 발견: 긴 한글 파일명이 1바이트여도 413 "최대 10MB" (Tomcat `maxPartHeaderSize` 512바이트), 정책 변경 로그 없음 등 → 문서 6장, 코드는 미조치
 
 ## 3. 다음에 할 것
 
-1. **`CONSIDERATIONS.md`** ← 다음 작업 (아래 3-1 참고)
-2. `README.md`: 실행 방법(SETUP.md 요약), table schema(컬럼/타입/제약/인덱스), 배포 URL
-3. `PROMPT_LOG.md` 회고: 그대로 쓴 것 / 고쳐 쓴 것 / 버린 것, AI가 놓쳤는데 직접 잡은 것
+1. `README.md` ← 다음 작업: 실행 방법(SETUP.md 요약), table schema(컬럼/타입/제약/인덱스), 배포 URL
+2. `PROMPT_LOG.md` 회고: 그대로 쓴 것 / 고쳐 쓴 것 / 버린 것, AI가 놓쳤는데 직접 잡은 것
+3. (선택) CONSIDERATIONS 6장의 미조치 항목 중 고칠 것 결정
 
 ### 3-1. CONSIDERATIONS.md 시작하기
 
