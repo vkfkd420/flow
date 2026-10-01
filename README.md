@@ -9,7 +9,7 @@
 | 고려사항 문서 | [CONSIDERATIONS.md](CONSIDERATIONS.md) |
 | AI 활용 기록 | [PROMPT_LOG.md](PROMPT_LOG.md) |
 
-> 인증이 없어 배포 사이트에서는 누구나 정책을 바꿀 수 있습니다. (과제 요건: 누구나 접속 가능한 URL, [CONSIDERATIONS 5-1](CONSIDERATIONS.md))
+> 인증이 없어 배포 사이트에서는 누구나 정책을 바꿀 수 있습니다. (과제 요건: 누구나 접속 가능한 URL)
 
 ## 주요 기능
 

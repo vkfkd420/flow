@@ -5,7 +5,7 @@
 - 마지막 갱신: 2026-10-01
 - 저장소: https://github.com/vkfkd420/flow
 - 과제 원문: [과제_파일업로드_AI개발.md](과제_파일업로드_AI개발.md)
-- 상세 진행 기록: [PROMPT_LOG.md](PROMPT_LOG.md) (#1 ~ #30)
+- 상세 진행 기록: [PROMPT_LOG.md](PROMPT_LOG.md) (#1 ~ #34)
 
 ---
 
@@ -22,10 +22,10 @@
 | 패키지명 | `com.flow` | |
 | 백엔드 패키지 구조 | `controller`, `service`, `dao`(@Mapper 인터페이스), `dto`(요청/응답 + DB 행), `common` | MyBatis XML은 `resources/mapper/{Dao 이름}.xml` |
 | 고정 확장자 | **체크 = 차단** | 기본값은 모두 해제 |
-| 인증 | 없음 (추후 고려) | 공개 배포 시 누구나 정책 변경 가능 → CONSIDERATIONS 5-1 |
+| 인증 | 없음 (추후 고려) | 공개 배포 시 누구나 정책 변경 가능 (README 상단에 명시) |
 | 접속 정보 | `backend/.env` (Git 제외) 또는 OS 환경 변수 | `backend/.env.example` 참고 |
 | 커밋 메시지 | `[강현민] 변경사항 내용` | `Co-Authored-By` 줄 붙이지 않음 |
-| PROMPT_LOG | Git 설정 이후 작업부터 기록 | 작업할 때마다 항목 추가 |
+| PROMPT_LOG | 프로젝트 작업만 기록 | 개발 PC 환경 구성·도구 설치·PC 이동, PROMPT_LOG 자체를 정리하는 작업은 기록하지 않음 |
 
 ## 2. 지금까지 한 것
 
@@ -38,7 +38,7 @@
 - [x] 로컬 MySQL 구성: DB `flow` (utf8mb4), 전용 계정 `flow@localhost` (`flow.*` 권한만)
 - [x] Spring Boot ↔ MySQL 연결 확인 (DataSource, MyBatis SqlSession 양쪽에서 쿼리 실행)
 - [x] 검증: frontend `lint` / `build` 통과, backend `mvnw test` 통과
-- [x] 두 번째 컴퓨터 환경 구성: JDK 17 (사용자 `JAVA_HOME` 17로 변경), MySQL 8.4.9, `backend/.env`, 연결 확인 (PROMPT_LOG #10~#14)
+- [x] 두 번째 컴퓨터 환경 구성: JDK 17 (사용자 `JAVA_HOME` 17로 변경), MySQL 8.4.9, `backend/.env`, 연결 확인 (PROMPT_LOG에는 기록하지 않음)
 - [x] 테이블 스키마: `FILE_EXTENSION_POLICY` 한 테이블 (`TYPE` FIXED/CUSTOM, `IS_BLOCKED`), `EXTENSION` UNIQUE, 형식 CHECK(`^[a-z0-9]{1,20}$`), 로컬 DB 적용 및 제약 테스트 (PROMPT_LOG #15)
   - 커스텀에 고정 확장자 입력 시 거부하고 안내 / 업로드 시 파일명의 모든 점 구간 검사 / 이력은 생성·수정 시각만
 - [x] 확장자 정책 API (PROMPT_LOG #16, 패키지 구조 #17) — 테스트 34개 통과
@@ -62,9 +62,10 @@
   - 공개 URL에서 정책 변경·업로드·차단·S3 저장(IAM 역할) 확인, 재부팅 후 자동 복구 확인
   - 테이블명은 항상 대문자 `FILE_EXTENSION_POLICY` (RDS는 `lower_case_table_names = 0`)
 
-- [x] 실행 가이드 `SETUP.md`, 자동 설정 `setup.ps1`, 과금 정리 가이드 `CLEANUP.md` (PROMPT_LOG #23, #24)
-- [x] `CONSIDERATIONS.md` (PROMPT_LOG #26~#28) — 과제 3번 전 항목(1~4장) + 과제 목록에 없던 3개(5장: 인증 없음·남용, 최소 권한, 다운로드 없음)
-  - 발견했지만 미조치(⚠️): 1-3 긴 한글 파일명이 1바이트여도 413 "최대 10MB" (Tomcat `maxPartHeaderSize` 512바이트), 1-4 켈빈 기호(U+212A)가 `k`로 통과, 5-1 인증·요청 수 제한 없음
+- [x] 실행 가이드 `SETUP.md`, 자동 설정 `setup.ps1`, 과금 정리 가이드 `CLEANUP.md` (PROMPT_LOG에는 기록하지 않음)
+- [x] `CONSIDERATIONS.md` (PROMPT_LOG #26~#28, #31) — 사용자가 정한 6개 항목만: 검증/보안 4, 정책/데이터 2 (+ 요약 표). 운영(UUID S3 저장, S3 권한)은 사용자가 뺌
+  - 문서에서 뺀 항목(이력·캐시·UX·로그·향후 확장·인증 등)의 판단은 PROMPT_LOG #26~#28과 Git 이력(`b449b72`)에 남아 있음
+  - 알고 있지만 미조치: 긴 한글 파일명이 1바이트여도 413 "최대 10MB" (Tomcat `maxPartHeaderSize` 512바이트), 켈빈 기호(U+212A)가 `k`로 통과, 인증·요청 수 제한 없음
 - [x] ErrorCode 구조 정리 (#27) 배포 서버 반영 (#29)
 - [x] `README.md` (#30) — 배포 URL, table schema, API, 실행 방법
 
@@ -72,7 +73,7 @@
 
 1. `PROMPT_LOG.md` 회고 ← 다음 작업: 그대로 쓴 것 / 고쳐 쓴 것 / 버린 것, AI가 놓쳤는데 직접 잡은 것
 2. (선택) 업로드 안내 문구 `확장자가 없어 이를 숨기고 있어` 다듬기 (재배포 필요, #29)
-3. (선택) CONSIDERATIONS의 ⚠️ 항목(1-3, 1-4, 5-1) 중 고칠 것 결정
+3. (선택) 알고 있지만 미조치인 것 중 고칠 것 결정: 긴 한글 파일명 413(Tomcat `maxPartHeaderSize`, #26), 켈빈 기호 `K`(#26), 인증·요청 수 제한 없음
 
 > 아래는 CONSIDERATIONS.md 작성 전에 정리한 준비 자료입니다. 작성은 끝났으므로(#26~#28) 최신 내용은 [CONSIDERATIONS.md](CONSIDERATIONS.md)를 보세요.
 
@@ -116,7 +117,7 @@
 - 없는 경로·잘못된 ID가 500으로 떨어지던 문제 (#16)
 - 최소 권한: S3 `uploads/*` PutObject만, EC2는 IAM 역할(액세스 키 없음), DB 앱 계정은 DML만·VPC 내부만 (#20, #21)
 - 전송·저장 보안: DB TLS(`sslMode=REQUIRED`), RDS 비공개, 스토리지 암호화, 버킷 퍼블릭 차단 (#21)
-- 비밀 관리: `.env`·키·비밀번호 파일을 저장소 밖에, 채팅으로 받지 않음 (#8, #21)
+- 비밀 관리: `.env`·키·비밀번호 파일을 저장소 밖에, 채팅으로 받지 않음 (#21)
 - 한글 파일명 인코딩 (#20)
 - 검토 후보(아직 기록 없음): 배포 jar에 프론트 소스맵(`*.js.map`) 포함 → 소스 노출 여부
 
