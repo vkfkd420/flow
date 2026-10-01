@@ -56,7 +56,7 @@ class ExtensionPolicyConcurrencyTest {
 					service.addCustom(extension);
 					return "OK";
 				} catch (ApiException e) {
-					return e.getCode();
+					return e.getCode().name();
 				}
 			}));
 		}

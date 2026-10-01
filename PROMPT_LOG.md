@@ -356,6 +356,24 @@ AI 활용 기록 (과제 4번 항목)
   - 과제 목록에 없던 항목 11개 (인증 없음, 남용·S3 누적 비용, Windows 파일명, 테이블명 대소문자, 500 처리, 최소 권한, 전송·저장 보안과 HTTP 평문, 비밀값 관리, 한글 파일명, 다운로드 없음으로 저장형 XSS 경로 없음, 소스맵)
   - 마지막에 "확인했지만 고치지 않은 것" 표 (영향·고칠 방향·위치)
 
+### #27 에러 응답 구조 정리 (ErrorCode enum)
+- **입력**: `백엔드쪽 코드를 좀더 간결화할수있을까?` → AI는 전체 724줄로 크게 줄일 곳이 없고, 리팩토링하면 재배포가 필요하다는 점(이 PC에는 SSH 키 없음)을 들어 손대지 않는 쪽을 추천 → `GlobalExceptionHandler, ApiException 이거 구조가 마음에안들어 좀 간결화하고싶은데`
+- **AI 질문** (미리보기): ErrorCode enum으로 모음 / ApiException 정적 메서드 / 핸들러만 정리 — 세 안 모두 응답 형식 `{ code, message }`는 유지
+- **선택**: **ErrorCode enum**
+- **AI 작업**:
+  - `common/ErrorCode.java` 추가: 상태 코드·코드·메시지 17개를 한 곳에. 메시지 속 숫자(20자, 200개, 255자, 10MB)는 enum에 다시 적지 않고 `%d`로 두고 기존 상수에서 넘김 → 숫자가 두 곳에 생겨 한쪽만 바뀌는 일 방지
+  - `ApiException(ErrorCode, Object... args)`: 서비스 호출이 `new ApiException(ErrorCode.DUPLICATE_EXTENSION, extension)` 한 줄로
+  - `GlobalExceptionHandler`: 문자열 코드·메시지를 모두 enum으로, 응답 생성은 `respond()` 하나로
+  - `FileUploadService`: `storageUnavailable()` 제거, `reject(code, name, args...)`
+- **동작 변경 (사용자에게 먼저 알림)**: enum은 코드 하나에 메시지 하나라, 코드 하나에 메시지가 두 개였던 2곳을 통일. 둘 다 화면에서는 나오지 않는 경우
+  - `INVALID_FILE_NAME`: 파일명이 null일 때의 "파일명이 없습니다." → "파일명이 없거나 사용할 수 없는 문자가 포함되어 있습니다."
+  - `INVALID_REQUEST`: 형식 오류(400)의 "요청 형식이 올바르지 않습니다." → 404/405와 같은 "요청을 처리할 수 없습니다."
+- **검증**:
+  - `mvnw clean test` 56개 통과 (테스트 변경은 동시성 테스트의 `getCode()` → `getCode().name()` 한 줄)
+  - **테스트는 code만 확인하고 메시지는 확인하지 않아서**, 바꾸기 전 문자열 연결로 만들던 문구와 enum이 만드는 문구를 jshell로 17건 대조 → 모두 일치. 사용자 입력에 `%`가 들어가도 형식 문자열로 해석되지 않음 확인
+    - 처음 실행에서 17건 모두 다르다고 나옴 → 결과가 아니라 jshell이 UTF-8 스크립트를 CP949로 읽은 문제였음, 인코딩 지정 후 재실행
+  - 로컬 서버에 실제 요청 9건(404/409/400 계열, 위장 실행 파일 2종)으로 상태 코드·code·문구 확인
+
 ---
 
 ## 2. 사용한 스킬 / 플러그인 / 도구

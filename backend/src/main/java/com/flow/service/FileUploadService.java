@@ -1,6 +1,7 @@
 package com.flow.service;
 
 import com.flow.common.ApiException;
+import com.flow.common.ErrorCode;
 import com.flow.common.ExecutableSignature;
 import com.flow.common.UploadFileRule;
 import com.flow.dao.ExtensionPolicyDao;
@@ -17,7 +18,6 @@ import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import software.amazon.awssdk.core.exception.SdkException;
@@ -45,7 +45,7 @@ public class FileUploadService {
 	public FileUploadResponse upload(MultipartFile file) {
 		String name = validateName(file.getOriginalFilename());
 		if (file.isEmpty()) {
-			throw reject("EMPTY_FILE", "빈 파일은 업로드할 수 없습니다.", name);
+			throw reject(ErrorCode.EMPTY_FILE, name);
 		}
 
 		// 1. 확장자 정책: 파일명의 모든 점 구간 검사 ("a.exe.txt"의 exe도 차단)
@@ -53,7 +53,7 @@ public class FileUploadService {
 		Set<String> blocked = new HashSet<>(dao.findBlockedExtensions());
 		for (String extension : extensions) {
 			if (blocked.contains(extension)) {
-				throw reject("BLOCKED_EXTENSION", "'" + extension + "' 확장자는 업로드가 차단되어 있습니다.", name);
+				throw reject(ErrorCode.BLOCKED_EXTENSION, name, extension);
 			}
 		}
 
@@ -62,8 +62,7 @@ public class FileUploadService {
 		ExecutableSignature signature = ExecutableSignature.detect(readHead(file));
 		if (signature != null && !signature.matchesExtension(lastExtension)) {
 			String disguise = lastExtension == null ? "확장자가 없어" : "확장자(" + lastExtension + ")가";
-			throw reject("DISGUISED_EXECUTABLE",
-				"파일 내용은 " + signature.label() + "인데 " + disguise + " 이를 숨기고 있어 업로드할 수 없습니다.", name);
+			throw reject(ErrorCode.DISGUISED_EXECUTABLE, name, signature.label(), disguise);
 		}
 
 		// 3. 저장: 원본 파일명을 키에 쓰지 않는다 (경로 조작·덮어쓰기 방지), 형식은 클라이언트 값을 믿지 않는다
@@ -74,17 +73,13 @@ public class FileUploadService {
 	}
 
 	private String validateName(String originalFilename) {
-		if (originalFilename == null) {
-			throw reject("INVALID_FILE_NAME", "파일명이 없습니다.", null);
-		}
-		String name = UploadFileRule.baseName(originalFilename).strip();
+		String name = originalFilename == null ? "" : UploadFileRule.baseName(originalFilename).strip();
 		if (name.isEmpty() || UploadFileRule.hasForbiddenChar(name)) {
 			// 제어 문자가 로그에 그대로 찍히지 않도록 파일명은 남기지 않는다
-			throw reject("INVALID_FILE_NAME", "파일명이 없거나 사용할 수 없는 문자가 포함되어 있습니다.", null);
+			throw reject(ErrorCode.INVALID_FILE_NAME, null);
 		}
 		if (name.length() > UploadFileRule.MAX_FILE_NAME_LENGTH) {
-			throw reject("FILE_NAME_TOO_LONG",
-				"파일명은 최대 " + UploadFileRule.MAX_FILE_NAME_LENGTH + "자까지 가능합니다.", null);
+			throw reject(ErrorCode.FILE_NAME_TOO_LONG, null, UploadFileRule.MAX_FILE_NAME_LENGTH);
 		}
 		return name;
 	}
@@ -93,14 +88,14 @@ public class FileUploadService {
 		try (InputStream in = file.getInputStream()) {
 			return in.readNBytes(ExecutableSignature.HEAD_SIZE);
 		} catch (IOException e) {
-			throw new ApiException(HttpStatus.BAD_REQUEST, "UNREADABLE_FILE", "파일을 읽을 수 없습니다. 다시 시도해 주세요.");
+			throw new ApiException(ErrorCode.UNREADABLE_FILE);
 		}
 	}
 
 	private void store(String key, MultipartFile file, String name) {
 		if (bucket == null || bucket.isBlank()) {
 			log.error("S3 버킷 설정(AWS_S3_BUCKET)이 없습니다.");
-			throw storageUnavailable();
+			throw new ApiException(ErrorCode.STORAGE_UNAVAILABLE);
 		}
 		PutObjectRequest request = PutObjectRequest.builder()
 			.bucket(bucket)
@@ -114,17 +109,13 @@ public class FileUploadService {
 			s3.putObject(request, RequestBody.fromInputStream(in, file.getSize()));
 		} catch (SdkException | IOException e) {
 			log.error("S3 저장 실패 key={}", key, e);
-			throw storageUnavailable();
+			throw new ApiException(ErrorCode.STORAGE_UNAVAILABLE);
 		}
 	}
 
-	private static ApiException storageUnavailable() {
-		return new ApiException(HttpStatus.SERVICE_UNAVAILABLE, "STORAGE_UNAVAILABLE",
-			"파일 저장소에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.");
-	}
-
-	private static ApiException reject(String code, String message, String name) {
+	/** 차단 사유를 로그에 남기고 예외를 만든다. args는 메시지에 들어갈 값 */
+	private static ApiException reject(ErrorCode code, String name, Object... args) {
 		log.warn("업로드 차단 code={} name={}", code, name);
-		return new ApiException(HttpStatus.BAD_REQUEST, code, message);
+		return new ApiException(code, args);
 	}
 }

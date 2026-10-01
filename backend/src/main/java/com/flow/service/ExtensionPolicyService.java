@@ -1,6 +1,7 @@
 package com.flow.service;
 
 import com.flow.common.ApiException;
+import com.flow.common.ErrorCode;
 import com.flow.common.ExtensionRule;
 import com.flow.dao.ExtensionPolicyDao;
 import com.flow.dto.CustomExtension;
@@ -9,7 +10,6 @@ import com.flow.dto.ExtensionPolicyResponse;
 import com.flow.dto.FixedExtension;
 import java.util.List;
 import org.springframework.dao.DuplicateKeyException;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,8 +41,7 @@ public class ExtensionPolicyService {
 	@Transactional
 	public FixedExtension updateFixed(String extension, boolean blocked) {
 		if (dao.updateFixedBlocked(extension, blocked) == 0) {
-			throw new ApiException(HttpStatus.NOT_FOUND, "FIXED_EXTENSION_NOT_FOUND",
-				"'" + extension + "'는 고정 확장자가 아닙니다.");
+			throw new ApiException(ErrorCode.FIXED_EXTENSION_NOT_FOUND, extension);
 		}
 		return new FixedExtension(extension, blocked);
 	}
@@ -51,8 +50,7 @@ public class ExtensionPolicyService {
 	public CustomExtension addCustom(String input) {
 		String extension = ExtensionRule.normalize(input);
 		if (extension == null) {
-			throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_EXTENSION",
-				"확장자는 영문과 숫자로 1~" + ExtensionRule.MAX_LENGTH + "자까지 입력할 수 있습니다.");
+			throw new ApiException(ErrorCode.INVALID_EXTENSION, ExtensionRule.MAX_LENGTH);
 		}
 
 		// 개수 확인과 INSERT 사이에 다른 요청이 끼어들지 않도록 먼저 잠근다 (200개 초과 방지)
@@ -63,8 +61,7 @@ public class ExtensionPolicyService {
 			throw duplicate(extension, existing);
 		}
 		if (count >= CUSTOM_LIMIT) {
-			throw new ApiException(HttpStatus.CONFLICT, "CUSTOM_LIMIT_EXCEEDED",
-				"커스텀 확장자는 최대 " + CUSTOM_LIMIT + "개까지 추가할 수 있습니다.");
+			throw new ApiException(ErrorCode.CUSTOM_LIMIT_EXCEEDED, CUSTOM_LIMIT);
 		}
 
 		try {
@@ -79,17 +76,12 @@ public class ExtensionPolicyService {
 	@Transactional
 	public void deleteCustom(Long id) {
 		if (dao.deleteCustom(id) == 0) {
-			throw new ApiException(HttpStatus.NOT_FOUND, "CUSTOM_EXTENSION_NOT_FOUND",
-				"삭제할 커스텀 확장자가 없습니다. 이미 삭제되었을 수 있습니다.");
+			throw new ApiException(ErrorCode.CUSTOM_EXTENSION_NOT_FOUND);
 		}
 	}
 
 	private ApiException duplicate(String extension, ExtensionPolicy existing) {
-		if (existing != null && ExtensionPolicy.FIXED.equals(existing.type())) {
-			return new ApiException(HttpStatus.CONFLICT, "FIXED_EXTENSION_CONFLICT",
-				"'" + extension + "'는 고정 확장자입니다. 고정 확장자 영역에서 체크해 주세요.");
-		}
-		return new ApiException(HttpStatus.CONFLICT, "DUPLICATE_EXTENSION",
-			"'" + extension + "'는 이미 추가된 확장자입니다.");
+		boolean fixed = existing != null && ExtensionPolicy.FIXED.equals(existing.type());
+		return new ApiException(fixed ? ErrorCode.FIXED_EXTENSION_CONFLICT : ErrorCode.DUPLICATE_EXTENSION, extension);
 	}
 }
