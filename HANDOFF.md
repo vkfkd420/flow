@@ -5,7 +5,7 @@
 - 마지막 갱신: 2026-10-01
 - 저장소: https://github.com/vkfkd420/flow
 - 과제 원문: [과제_파일업로드_AI개발.md](과제_파일업로드_AI개발.md)
-- 상세 진행 기록: [PROMPT_LOG.md](PROMPT_LOG.md) (#1 ~ #28)
+- 상세 진행 기록: [PROMPT_LOG.md](PROMPT_LOG.md) (#1 ~ #29)
 
 ---
 
@@ -22,7 +22,7 @@
 | 패키지명 | `com.flow` | |
 | 백엔드 패키지 구조 | `controller`, `service`, `dao`(@Mapper 인터페이스), `dto`(요청/응답 + DB 행), `common` | MyBatis XML은 `resources/mapper/{Dao 이름}.xml` |
 | 고정 확장자 | **체크 = 차단** | 기본값은 모두 해제 |
-| 인증 | 없음 (추후 고려) | 공개 배포 시 누구나 정책 변경 가능 → CONSIDERATIONS에 기록 예정 |
+| 인증 | 없음 (추후 고려) | 공개 배포 시 누구나 정책 변경 가능 → CONSIDERATIONS 5-1 |
 | 접속 정보 | `backend/.env` (Git 제외) 또는 OS 환경 변수 | `backend/.env.example` 참고 |
 | 커밋 메시지 | `[강현민] 변경사항 내용` | `Co-Authored-By` 줄 붙이지 않음 |
 | PROMPT_LOG | Git 설정 이후 작업부터 기록 | 작업할 때마다 항목 추가 |
@@ -63,16 +63,19 @@
   - 테이블명은 항상 대문자 `FILE_EXTENSION_POLICY` (RDS는 `lower_case_table_names = 0`)
 
 - [x] 실행 가이드 `SETUP.md`, 자동 설정 `setup.ps1`, 과금 정리 가이드 `CLEANUP.md` (PROMPT_LOG #23, #24)
-- [x] `CONSIDERATIONS.md` (PROMPT_LOG #26) — 과제 3번 전 항목 + 과제 목록에 없던 11개, 마지막에 "확인했지만 고치지 않은 것" 표
-  - 작성 중 발견: 긴 한글 파일명이 1바이트여도 413 "최대 10MB" (Tomcat `maxPartHeaderSize` 512바이트), 정책 변경 로그 없음 등 → 문서 6장, 코드는 미조치
+- [x] `CONSIDERATIONS.md` (PROMPT_LOG #26~#28) — 과제 3번 전 항목(1~4장) + 과제 목록에 없던 3개(5장: 인증 없음·남용, 최소 권한, 다운로드 없음)
+  - 발견했지만 미조치(⚠️): 1-3 긴 한글 파일명이 1바이트여도 413 "최대 10MB" (Tomcat `maxPartHeaderSize` 512바이트), 1-4 켈빈 기호(U+212A)가 `k`로 통과, 5-1 인증·요청 수 제한 없음
+- [x] ErrorCode 구조 정리 (#27) 배포 서버 반영 (#29)
 
 ## 3. 다음에 할 것
 
 1. `README.md` ← 다음 작업: 실행 방법(SETUP.md 요약), table schema(컬럼/타입/제약/인덱스), 배포 URL
 2. `PROMPT_LOG.md` 회고: 그대로 쓴 것 / 고쳐 쓴 것 / 버린 것, AI가 놓쳤는데 직접 잡은 것
-3. (선택) CONSIDERATIONS 6장의 미조치 항목 중 고칠 것 결정
+3. (선택) CONSIDERATIONS의 ⚠️ 항목(1-3, 1-4, 5-1) 중 고칠 것 결정
 
-### 3-1. CONSIDERATIONS.md 시작하기
+> 아래는 CONSIDERATIONS.md 작성 전에 정리한 준비 자료입니다. 작성은 끝났으므로(#26~#28) 최신 내용은 [CONSIDERATIONS.md](CONSIDERATIONS.md)를 보세요.
+
+### 3-1. (완료) CONSIDERATIONS.md 작성 준비 자료
 
 **다른 PC에서 시작 순서**
 1. `git pull` (처음이면 clone 후 `setup.ps1` — [SETUP.md](SETUP.md))
